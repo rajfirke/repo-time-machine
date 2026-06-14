@@ -8,6 +8,7 @@ from pathlib import Path
 
 import typer
 from rich.console import Console
+from rich.markdown import Markdown
 from rich.table import Table
 
 from repo_time_machine.ingestion.code_loader import ingest_repo
@@ -98,6 +99,14 @@ def ask(
         help="Path to the repository (must have been indexed first).",
     ),
     top_k: int = typer.Option(5, "--top-k", "-k", help="Number of evidence pieces to retrieve."),
+    llm_model: str = typer.Option(
+        "qwen2.5-coder:7b", "--llm", "-l",
+        help="Ollama model for answer synthesis.",
+    ),
+    raw: bool = typer.Option(
+        False, "--raw",
+        help="Show raw evidence without LLM synthesis.",
+    ),
 ):
     """Ask a question about the indexed repository."""
     repo = Path(repo_path).resolve()
@@ -108,56 +117,25 @@ def ask(
         )
         raise typer.Exit(1)
 
-    from repo_time_machine.retrieval.store import load_config
-
-    cfg = load_config(repo)
-    model = cfg.get("model", "BAAI/bge-small-en-v1.5") if cfg else "BAAI/bge-small-en-v1.5"
-    rtm_path = ensure_rtm_dir(repo)
-    embedder = get_embedder(model)
+    from repo_time_machine.agent.pipeline import Pipeline
 
     console.print(f"\n[bold]Question:[/bold] {question}\n")
 
-    code_ret = CodeRetriever(rtm_path, embedder)
-    hist_ret = HistoryRetriever(rtm_path, embedder)
-
-    if not code_ret.load() or not hist_ret.load():
+    pipeline = Pipeline(repo_path=repo, llm_model=llm_model, top_k=top_k)
+    if not pipeline.ready:
         console.print("[red]Error:[/red] Could not load indexes. Re-run [bold]rtm index[/bold].")
         raise typer.Exit(1)
 
-    console.print("[dim]Searching code...[/dim]")
-    code_results = code_ret.query(question, top_k=top_k)
+    with console.status("[dim]Thinking...[/dim]"):
+        answer = pipeline.ask(question)
 
-    console.print("[dim]Searching history...[/dim]")
-    hist_results = hist_ret.query(question, top_k=top_k)
+    if answer.used_llm:
+        console.print("[green]LLM-synthesized answer[/green]\n")
+    else:
+        console.print("[yellow]Evidence-only answer (Ollama not running)[/yellow]\n")
 
-    if code_results:
-        console.print("\n[bold]Code Evidence[/bold]\n")
-        for i, cr in enumerate(code_results, 1):
-            console.print(f"  [cyan]{i}.[/cyan] {cr.header()}  (score: {cr.score:.3f})")
-            snippet = cr.content.strip().split("\n")
-            for line in snippet[:5]:
-                console.print(f"      {line}")
-            if len(snippet) > 5:
-                console.print(f"      [dim]... +{len(snippet) - 5} more lines[/dim]")
-            console.print()
-
-    if hist_results:
-        console.print("[bold]History Evidence[/bold]\n")
-        for i, hr in enumerate(hist_results, 1):
-            c = hr.commit
-            console.print(
-                f"  [cyan]{i}.[/cyan] [{c.short_sha}] {c.date} — "
-                f"{c.message.split(chr(10), 1)[0]}"
-            )
-            console.print(f"      relevance: {hr.relevance}  (score: {hr.score:.3f})")
-            if c.files_changed:
-                console.print(f"      files: {', '.join(c.files_changed[:5])}")
-            console.print()
-
-    if not code_results and not hist_results:
-        console.print("[yellow]No relevant evidence found.[/yellow]")
-
-    console.print("[dim]Tip: Day 3 will add the LLM answer synthesis layer.[/dim]")
+    md = Markdown(answer.render())
+    console.print(md)
 
 
 if __name__ == "__main__":
