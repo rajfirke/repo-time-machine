@@ -7,6 +7,7 @@ from dataclasses import dataclass, field
 from repo_time_machine.agent.llm import LLMResponse, generate
 from repo_time_machine.retrieval.code_retriever import CodeResult
 from repo_time_machine.retrieval.history_retriever import HistoryResult
+from repo_time_machine.retrieval.issue_retriever import IssueResult
 
 
 @dataclass
@@ -78,6 +79,23 @@ def _history_to_evidence(results: list[HistoryResult]) -> list[Evidence]:
     return items
 
 
+def _issue_to_evidence(results: list[IssueResult]) -> list[Evidence]:
+    items: list[Evidence] = []
+    for ir in results:
+        rec = ir.issue
+        tag = "PR" if rec.is_pr else "issue"
+        body_preview = rec.body.strip()[:400] if rec.body else "(no description)"
+        excerpt = f"[{tag}] {rec.title}\n{body_preview}"
+        if rec.labels:
+            excerpt += f"\nLabels: {', '.join(rec.labels)}"
+        items.append(Evidence(
+            source="issue",
+            reference=f"#{rec.number} ({rec.url})",
+            excerpt=excerpt,
+        ))
+    return items
+
+
 def _build_timeline(hist_results: list[HistoryResult]) -> list[str]:
     seen = set()
     entries: list[str] = []
@@ -93,10 +111,10 @@ def _build_timeline(hist_results: list[HistoryResult]) -> list[str]:
 
 SYSTEM_PROMPT = """\
 You are Repo Time Machine, a code historian. You answer questions about a \
-codebase using evidence from source files, git commits, and issues.
+codebase using evidence from source files, git commits, and GitHub issues/PRs.
 
 Rules:
-- Cite every claim with [code] or [commit] references from the evidence below.
+- Cite every claim with [code], [commit], or [issue] references from the evidence below.
 - If the evidence is insufficient, say so honestly.
 - End with a concrete suggested next action.
 - Be concise. No filler."""
@@ -135,10 +153,12 @@ class AnswerBuilder:
         question: str,
         code_results: list[CodeResult],
         hist_results: list[HistoryResult],
+        issue_results: list[IssueResult] | None = None,
     ) -> Answer:
         code_evidence = _code_to_evidence(code_results)
         hist_evidence = _history_to_evidence(hist_results)
-        all_evidence = code_evidence + hist_evidence
+        issue_evidence = _issue_to_evidence(issue_results) if issue_results else []
+        all_evidence = code_evidence + hist_evidence + issue_evidence
         timeline = _build_timeline(hist_results)
 
         if not all_evidence:
@@ -191,6 +211,7 @@ def _fallback_answer(
     """Build an answer without an LLM — just structured evidence."""
     code_refs = [e for e in evidence if e.source == "code"]
     commit_refs = [e for e in evidence if e.source == "commit"]
+    issue_refs = [e for e in evidence if e.source == "issue"]
 
     parts: list[str] = []
     if code_refs:
@@ -203,6 +224,12 @@ def _fallback_answer(
         parts.append(
             f"Found {len(commit_refs)} relevant commit(s): "
             + ", ".join(f"`{e.reference}`" for e in commit_refs[:3])
+            + "."
+        )
+    if issue_refs:
+        parts.append(
+            f"Found {len(issue_refs)} relevant issue(s)/PR(s): "
+            + ", ".join(f"`{e.reference}`" for e in issue_refs[:3])
             + "."
         )
     parts.append(

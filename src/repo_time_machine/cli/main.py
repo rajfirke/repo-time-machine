@@ -16,6 +16,7 @@ from repo_time_machine.ingestion.git_history import extract_history
 from repo_time_machine.retrieval.code_retriever import CodeRetriever
 from repo_time_machine.retrieval.embeddings import get_embedder
 from repo_time_machine.retrieval.history_retriever import HistoryRetriever
+from repo_time_machine.retrieval.issue_retriever import IssueRetriever
 from repo_time_machine.retrieval.store import ensure_rtm_dir, is_indexed, save_config
 
 console = Console()
@@ -38,35 +39,48 @@ def index(
     ),
     github_slug: str = typer.Option(
         None, "--github", "-g",
-        help="Optional GitHub repo slug (owner/repo) to enrich with issues and PRs.",
+        help="GitHub repo slug (owner/repo) to fetch issues and PRs from.",
     ),
+    max_issues: int = typer.Option(200, "--max-issues", help="Max issues/PRs to fetch."),
 ):
-    """Ingest a repository: index source files and extract git history."""
+    """Ingest a repository: index source files, git history, and optionally GitHub issues."""
     repo = Path(repo_path).resolve()
     if not (repo / ".git").is_dir():
         console.print(f"[red]Error:[/red] {repo} is not a git repository.")
         raise typer.Exit(1)
 
     t0 = time.time()
+    has_github = bool(github_slug)
+    steps = "4" if has_github else "3"
     console.print(f"\n[bold]Indexing:[/bold] {repo}\n")
 
     rtm_path = ensure_rtm_dir(repo)
     embedder = get_embedder(model)
 
-    console.print("[dim]1/3[/dim] Ingesting source files...")
+    console.print(f"[dim]1/{steps}[/dim] Ingesting source files...")
     chunks = ingest_repo(repo, chunk_lines=chunk_lines, overlap_lines=overlap)
     console.print(f"      {len(chunks)} code chunks extracted")
 
-    console.print("[dim]2/3[/dim] Extracting git history...")
+    console.print(f"[dim]2/{steps}[/dim] Extracting git history...")
     commits = extract_history(repo, max_commits=max_commits)
     console.print(f"      {len(commits)} commits extracted")
 
-    console.print("[dim]3/3[/dim] Building embeddings and FAISS indexes...")
+    console.print(f"[dim]3/{steps}[/dim] Building embeddings and FAISS indexes...")
     code_ret = CodeRetriever(rtm_path, embedder)
     code_count = code_ret.build(chunks)
 
     hist_ret = HistoryRetriever(rtm_path, embedder)
     hist_count = hist_ret.build(commits)
+
+    issue_count = 0
+    if has_github:
+        console.print(f"[dim]4/{steps}[/dim] Fetching GitHub issues/PRs from {github_slug}...")
+        issue_ret = IssueRetriever(rtm_path, embedder, repo_slug=github_slug)
+        issue_count = issue_ret.fetch_and_build(max_items=max_issues)
+        if issue_count:
+            console.print(f"      {issue_count} issues/PRs indexed")
+        else:
+            console.print("      [yellow]No issues fetched (check GITHUB_TOKEN)[/yellow]")
 
     elapsed = time.time() - t0
     save_config(repo, {
@@ -77,6 +91,7 @@ def index(
         "code_chunks": code_count,
         "commits_indexed": hist_count,
         "github_slug": github_slug,
+        "issues_indexed": issue_count,
     })
 
     console.print(f"\n[green]Done in {elapsed:.1f}s[/green]")
@@ -86,6 +101,8 @@ def index(
     table.add_column("Value")
     table.add_row("Code chunks", str(code_count))
     table.add_row("Commits", str(hist_count))
+    if has_github:
+        table.add_row("Issues/PRs", str(issue_count))
     table.add_row("Index location", str(rtm_path))
     table.add_row("Embedding model", model)
     console.print(table)
@@ -125,6 +142,9 @@ def ask(
     if not pipeline.ready:
         console.print("[red]Error:[/red] Could not load indexes. Re-run [bold]rtm index[/bold].")
         raise typer.Exit(1)
+
+    if pipeline.has_issues:
+        console.print("[dim]GitHub issues/PRs available for enrichment[/dim]")
 
     with console.status("[dim]Thinking...[/dim]"):
         answer = pipeline.ask(question)
