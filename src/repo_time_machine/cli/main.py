@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import logging
 import time
 from pathlib import Path
 
@@ -34,11 +33,15 @@ def index(
     chunk_lines: int = typer.Option(60, "--chunk-lines", help="Lines per code chunk."),
     overlap: int = typer.Option(10, "--overlap", help="Overlap lines between chunks."),
     model: str = typer.Option(
-        "BAAI/bge-small-en-v1.5", "--model", "-m",
+        "BAAI/bge-small-en-v1.5",
+        "--model",
+        "-m",
         help="Sentence-transformers model for embeddings.",
     ),
     github_slug: str = typer.Option(
-        None, "--github", "-g",
+        None,
+        "--github",
+        "-g",
         help="GitHub repo slug (owner/repo) to fetch issues and PRs from.",
     ),
     max_issues: int = typer.Option(200, "--max-issues", help="Max issues/PRs to fetch."),
@@ -83,16 +86,19 @@ def index(
             console.print("      [yellow]No issues fetched (check GITHUB_TOKEN)[/yellow]")
 
     elapsed = time.time() - t0
-    save_config(repo, {
-        "model": model,
-        "chunk_lines": chunk_lines,
-        "overlap": overlap,
-        "max_commits": max_commits,
-        "code_chunks": code_count,
-        "commits_indexed": hist_count,
-        "github_slug": github_slug,
-        "issues_indexed": issue_count,
-    })
+    save_config(
+        repo,
+        {
+            "model": model,
+            "chunk_lines": chunk_lines,
+            "overlap": overlap,
+            "max_commits": max_commits,
+            "code_chunks": code_count,
+            "commits_indexed": hist_count,
+            "github_slug": github_slug,
+            "issues_indexed": issue_count,
+        },
+    )
 
     console.print(f"\n[green]Done in {elapsed:.1f}s[/green]")
 
@@ -112,16 +118,21 @@ def index(
 def ask(
     question: str = typer.Argument(..., help="The question to ask about the repository."),
     repo_path: str = typer.Option(
-        ".", "--repo", "-r",
+        ".",
+        "--repo",
+        "-r",
         help="Path to the repository (must have been indexed first).",
     ),
     top_k: int = typer.Option(5, "--top-k", "-k", help="Number of evidence pieces to retrieve."),
     llm_model: str = typer.Option(
-        "qwen2.5-coder:7b", "--llm", "-l",
+        "qwen2.5-coder:7b",
+        "--llm",
+        "-l",
         help="Ollama model for answer synthesis.",
     ),
     raw: bool = typer.Option(
-        False, "--raw",
+        False,
+        "--raw",
         help="Show raw evidence without LLM synthesis.",
     ),
 ):
@@ -129,8 +140,7 @@ def ask(
     repo = Path(repo_path).resolve()
     if not is_indexed(repo):
         console.print(
-            f"[red]Error:[/red] {repo} has not been indexed yet. "
-            "Run [bold]rtm index[/bold] first."
+            f"[red]Error:[/red] {repo} has not been indexed yet. Run [bold]rtm index[/bold] first."
         )
         raise typer.Exit(1)
 

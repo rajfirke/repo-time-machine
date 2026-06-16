@@ -1,9 +1,6 @@
 """Tests for the agent layer: router, answer builder, LLM fallback, and pipeline."""
 
-from unittest.mock import MagicMock, patch
-
-import numpy as np
-import pytest
+from unittest.mock import patch
 
 from repo_time_machine.agent.answer import (
     Answer,
@@ -27,7 +24,6 @@ from repo_time_machine.ingestion.git_history import CommitRecord
 from repo_time_machine.retrieval.code_retriever import CodeResult
 from repo_time_machine.retrieval.history_retriever import HistoryResult
 
-
 # ---------------------------------------------------------------------------
 # Router tests
 # ---------------------------------------------------------------------------
@@ -44,7 +40,8 @@ class TestClassify:
         assert classify("Which issue explains the design decision?") == QuestionType.ISSUE
 
     def test_mixed_question(self):
-        assert classify("Why was this function changed and what issue explains it?") == QuestionType.MIXED
+        q = "Why was this function changed and what issue explains it?"
+        assert classify(q) == QuestionType.MIXED
 
     def test_default_is_code(self):
         assert classify("hello world") == QuestionType.CODE
@@ -73,17 +70,25 @@ class TestShouldSearch:
 # Evidence conversion tests
 # ---------------------------------------------------------------------------
 
+
 def _sample_code_results():
     return [
-        CodeResult(file="src/main.py", start_line=1, end_line=20,
-                   content="def hello():\n    print('hello')\n",
-                   language="python", score=0.9),
+        CodeResult(
+            file="src/main.py",
+            start_line=1,
+            end_line=20,
+            content="def hello():\n    print('hello')\n",
+            language="python",
+            score=0.9,
+        ),
     ]
 
 
 def _sample_hist_results():
     commit = CommitRecord(
-        sha="aaa11122", author="Alice", date="2025-01-15 10:00:00",
+        sha="aaa11122",
+        author="Alice",
+        date="2025-01-15 10:00:00",
         message="Add input validation",
         files_changed=["src/utils.py"],
         diff_summary="M src/utils.py",
@@ -187,7 +192,10 @@ class TestAnswerBuilder:
     def test_with_llm(self):
         builder = AnswerBuilder(model="test")
         fake_resp = LLMResponse(
-            text="The validation was added for safety.\n\nSuggested next action:\nAdd edge case tests.",
+            text=(
+                "The validation was added for safety.\n\n"
+                "Suggested next action:\nAdd edge case tests."
+            ),
             model="test",
             used_llm=True,
         )

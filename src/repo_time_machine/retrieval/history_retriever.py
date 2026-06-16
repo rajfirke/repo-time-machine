@@ -9,7 +9,6 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import faiss
-import numpy as np
 
 from repo_time_machine.ingestion.git_history import CommitRecord
 from repo_time_machine.retrieval.embeddings import Embedder
@@ -20,7 +19,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class HistoryResult:
     commit: CommitRecord
-    relevance: str    # short explanation of why this matched
+    relevance: str  # short explanation of why this matched
     score: float = 0.0
 
 
@@ -94,10 +93,7 @@ class HistoryRetriever:
                 continue
             rec = self._records[idx]
             kw_score = _keyword_score(q_tokens, rec)
-            blended = (
-                self.SEMANTIC_WEIGHT * float(sem_score)
-                + self.KEYWORD_WEIGHT * kw_score
-            )
+            blended = self.SEMANTIC_WEIGHT * float(sem_score) + self.KEYWORD_WEIGHT * kw_score
             scored.append((blended, idx, float(sem_score), kw_score))
 
         scored.sort(key=lambda t: t[0], reverse=True)
@@ -117,9 +113,14 @@ class HistoryRetriever:
         self.index_dir.mkdir(parents=True, exist_ok=True)
         faiss.write_index(self._index, str(self.index_dir / self.INDEX_FILE))
         raw = [
-            {"sha": c.sha, "author": c.author, "date": c.date,
-             "message": c.message, "files_changed": c.files_changed,
-             "diff_summary": c.diff_summary}
+            {
+                "sha": c.sha,
+                "author": c.author,
+                "date": c.date,
+                "message": c.message,
+                "files_changed": c.files_changed,
+                "diff_summary": c.diff_summary,
+            }
             for c in self._records
         ]
         with open(self.index_dir / self.META_FILE, "w", encoding="utf-8") as f:

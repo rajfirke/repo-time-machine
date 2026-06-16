@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 import logging
 from dataclasses import dataclass
 
@@ -42,9 +41,7 @@ def generate(prompt: str, model: str = DEFAULT_MODEL) -> LLMResponse:
             used_llm=True,
         )
     except (requests.ConnectionError, requests.Timeout):
-        logger.warning(
-            "Ollama not reachable at %s — returning evidence-only answer", OLLAMA_URL
-        )
+        logger.warning("Ollama not reachable at %s — returning evidence-only answer", OLLAMA_URL)
         return LLMResponse(
             text="",
             model=model,

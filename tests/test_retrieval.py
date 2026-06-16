@@ -1,22 +1,19 @@
 """Tests for the retrieval layer — uses synthetic embeddings to stay fast."""
 
-from pathlib import Path
 from unittest.mock import MagicMock
 
 import numpy as np
-import pytest
 
 from repo_time_machine.ingestion.code_loader import FileChunk
 from repo_time_machine.ingestion.git_history import CommitRecord
-from repo_time_machine.retrieval.code_retriever import CodeRetriever, CodeResult
+from repo_time_machine.retrieval.code_retriever import CodeResult, CodeRetriever
 from repo_time_machine.retrieval.history_retriever import (
-    HistoryRetriever,
     HistoryResult,
+    HistoryRetriever,
     _keyword_score,
     _tokenize,
 )
 from repo_time_machine.retrieval.store import (
-    ensure_rtm_dir,
     is_indexed,
     load_config,
     save_config,
@@ -43,29 +40,56 @@ def _fake_embedder() -> MagicMock:
 
 def _sample_chunks() -> list[FileChunk]:
     return [
-        FileChunk(file="src/main.py", start_line=1, end_line=20,
-                  content="def hello():\n    print('hello world')\n", language="python"),
-        FileChunk(file="src/utils.py", start_line=1, end_line=15,
-                  content="def validate(x):\n    if x < 0:\n        raise ValueError\n",
-                  language="python"),
-        FileChunk(file="README.md", start_line=1, end_line=10,
-                  content="# My Project\nA sample project.\n", language="markdown"),
+        FileChunk(
+            file="src/main.py",
+            start_line=1,
+            end_line=20,
+            content="def hello():\n    print('hello world')\n",
+            language="python",
+        ),
+        FileChunk(
+            file="src/utils.py",
+            start_line=1,
+            end_line=15,
+            content="def validate(x):\n    if x < 0:\n        raise ValueError\n",
+            language="python",
+        ),
+        FileChunk(
+            file="README.md",
+            start_line=1,
+            end_line=10,
+            content="# My Project\nA sample project.\n",
+            language="markdown",
+        ),
     ]
 
 
 def _sample_commits() -> list[CommitRecord]:
     return [
-        CommitRecord(sha="aaa111", author="Alice", date="2025-01-15 10:00:00",
-                     message="Add input validation to utils",
-                     files_changed=["src/utils.py"], diff_summary="M src/utils.py"),
-        CommitRecord(sha="bbb222", author="Bob", date="2025-01-10 09:00:00",
-                     message="Initial commit with hello world",
-                     files_changed=["src/main.py", "README.md"],
-                     diff_summary="A src/main.py\nA README.md"),
-        CommitRecord(sha="ccc333", author="Alice", date="2025-01-20 14:00:00",
-                     message="Fix bug in validation edge case",
-                     files_changed=["src/utils.py"],
-                     diff_summary="M src/utils.py"),
+        CommitRecord(
+            sha="aaa111",
+            author="Alice",
+            date="2025-01-15 10:00:00",
+            message="Add input validation to utils",
+            files_changed=["src/utils.py"],
+            diff_summary="M src/utils.py",
+        ),
+        CommitRecord(
+            sha="bbb222",
+            author="Bob",
+            date="2025-01-10 09:00:00",
+            message="Initial commit with hello world",
+            files_changed=["src/main.py", "README.md"],
+            diff_summary="A src/main.py\nA README.md",
+        ),
+        CommitRecord(
+            sha="ccc333",
+            author="Alice",
+            date="2025-01-20 14:00:00",
+            message="Fix bug in validation edge case",
+            files_changed=["src/utils.py"],
+            diff_summary="M src/utils.py",
+        ),
     ]
 
 
@@ -118,8 +142,9 @@ class TestCodeRetriever:
         assert ret.load() is False
 
     def test_result_header(self):
-        r = CodeResult(file="a.py", start_line=1, end_line=10,
-                       content="x", language="python", score=0.9)
+        r = CodeResult(
+            file="a.py", start_line=1, end_line=10, content="x", language="python", score=0.9
+        )
         assert "a.py:1-10" in r.header()
 
 
@@ -169,7 +194,7 @@ class TestHistoryRetriever:
         """Commits with matching keywords should score higher on the kw component."""
         q_tokens = _tokenize("validation utils")
         commit_match = _sample_commits()[0]  # "Add input validation to utils"
-        commit_no = _sample_commits()[1]      # "Initial commit with hello world"
+        commit_no = _sample_commits()[1]  # "Initial commit with hello world"
         assert _keyword_score(q_tokens, commit_match) > _keyword_score(q_tokens, commit_no)
 
 

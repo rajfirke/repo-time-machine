@@ -3,7 +3,6 @@
 from unittest.mock import MagicMock
 
 import numpy as np
-import pytest
 
 from repo_time_machine.retrieval.issue_retriever import (
     IssueRecord,
@@ -35,22 +34,31 @@ def _fake_embedder() -> MagicMock:
 def _sample_issues() -> list[IssueRecord]:
     return [
         IssueRecord(
-            number=42, title="Fix validation crash on empty input",
+            number=42,
+            title="Fix validation crash on empty input",
             body="When the input is empty, validate() raises IndexError instead of ValueError.",
             url="https://github.com/test/repo/issues/42",
-            labels=["bug", "good first issue"], is_pr=False, state="open",
+            labels=["bug", "good first issue"],
+            is_pr=False,
+            state="open",
         ),
         IssueRecord(
-            number=55, title="Add retry logic to API client",
+            number=55,
+            title="Add retry logic to API client",
             body="The API client should retry on 429 and 5xx responses with exponential backoff.",
             url="https://github.com/test/repo/issues/55",
-            labels=["enhancement"], is_pr=False, state="open",
+            labels=["enhancement"],
+            is_pr=False,
+            state="open",
         ),
         IssueRecord(
-            number=60, title="Refactor CLI to use Typer",
+            number=60,
+            title="Refactor CLI to use Typer",
             body="Replace argparse with typer for better UX and type checking.",
             url="https://github.com/test/repo/pull/60",
-            labels=["refactor"], is_pr=True, state="closed",
+            labels=["refactor"],
+            is_pr=True,
+            state="closed",
         ),
     ]
 

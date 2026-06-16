@@ -10,7 +10,6 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 import faiss
-import numpy as np
 
 from repo_time_machine.retrieval.embeddings import Embedder
 
@@ -135,11 +134,13 @@ class IssueRetriever:
         for blended, idx in scored[:top_k]:
             rec = self._records[idx]
             tag = "PR" if rec.is_pr else "issue"
-            results.append(IssueResult(
-                issue=rec,
-                relevance=f"matched {tag} #{rec.number}",
-                score=blended,
-            ))
+            results.append(
+                IssueResult(
+                    issue=rec,
+                    relevance=f"matched {tag} #{rec.number}",
+                    score=blended,
+                )
+            )
         return results
 
     @property
@@ -150,9 +151,15 @@ class IssueRetriever:
         self.index_dir.mkdir(parents=True, exist_ok=True)
         faiss.write_index(self._index, str(self.index_dir / self.INDEX_FILE))
         raw = [
-            {"number": r.number, "title": r.title, "body": r.body,
-             "url": r.url, "labels": r.labels, "is_pr": r.is_pr,
-             "state": r.state}
+            {
+                "number": r.number,
+                "title": r.title,
+                "body": r.body,
+                "url": r.url,
+                "labels": r.labels,
+                "is_pr": r.is_pr,
+                "state": r.state,
+            }
             for r in self._records
         ]
         with open(self.index_dir / self.META_FILE, "w", encoding="utf-8") as f:
@@ -184,15 +191,17 @@ def _fetch_from_github(repo_slug: str, token: str, max_items: int) -> list[Issue
             break
         body = (item.body or "")[:2000]
         labels = [lbl.name for lbl in item.labels]
-        records.append(IssueRecord(
-            number=item.number,
-            title=item.title,
-            body=body,
-            url=item.html_url,
-            labels=labels,
-            is_pr=item.pull_request is not None,
-            state=item.state,
-        ))
+        records.append(
+            IssueRecord(
+                number=item.number,
+                title=item.title,
+                body=body,
+                url=item.html_url,
+                labels=labels,
+                is_pr=item.pull_request is not None,
+                state=item.state,
+            )
+        )
         count += 1
 
     return records

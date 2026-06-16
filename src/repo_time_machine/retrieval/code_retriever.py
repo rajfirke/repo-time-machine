@@ -4,11 +4,10 @@ from __future__ import annotations
 
 import json
 import logging
-from dataclasses import asdict, dataclass
+from dataclasses import dataclass
 from pathlib import Path
 
 import faiss
-import numpy as np
 
 from repo_time_machine.ingestion.code_loader import FileChunk
 from repo_time_machine.retrieval.embeddings import Embedder
@@ -58,9 +57,13 @@ class CodeRetriever:
         self._index.add(vectors)
 
         self._meta = [
-            {"file": c.file, "start_line": c.start_line,
-             "end_line": c.end_line, "content": c.content,
-             "language": c.language}
+            {
+                "file": c.file,
+                "start_line": c.start_line,
+                "end_line": c.end_line,
+                "content": c.content,
+                "language": c.language,
+            }
             for c in chunks
         ]
 
@@ -92,11 +95,16 @@ class CodeRetriever:
             if idx < 0:
                 continue
             m = self._meta[idx]
-            results.append(CodeResult(
-                file=m["file"], start_line=m["start_line"],
-                end_line=m["end_line"], content=m["content"],
-                language=m["language"], score=float(score),
-            ))
+            results.append(
+                CodeResult(
+                    file=m["file"],
+                    start_line=m["start_line"],
+                    end_line=m["end_line"],
+                    content=m["content"],
+                    language=m["language"],
+                    score=float(score),
+                )
+            )
         return results
 
     def _save(self):

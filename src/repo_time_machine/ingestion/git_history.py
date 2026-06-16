@@ -136,7 +136,5 @@ def file_timeline(
     for commit in repo.iter_commits(paths=relative_file_path, max_count=max_commits):
         records.append(_to_record(commit))
 
-    logger.info(
-        "Found %d commits touching '%s'", len(records), relative_file_path
-    )
+    logger.info("Found %d commits touching '%s'", len(records), relative_file_path)
     return records

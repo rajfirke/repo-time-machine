@@ -2,31 +2,71 @@
 
 from __future__ import annotations
 
-from enum import Enum
+from enum import StrEnum
 
 
-class QuestionType(str, Enum):
-    CODE = "code"         # about current source: what does X do?
-    HISTORY = "history"   # about past changes: why/when did X change?
-    ISSUE = "issue"       # about intent/discussion: which PR explains X?
-    MIXED = "mixed"       # needs multiple sources
+class QuestionType(StrEnum):
+    CODE = "code"  # about current source: what does X do?
+    HISTORY = "history"  # about past changes: why/when did X change?
+    ISSUE = "issue"  # about intent/discussion: which PR explains X?
+    MIXED = "mixed"  # needs multiple sources
 
 
 _HISTORY_KEYWORDS = {
-    "why", "when", "changed", "introduced", "added", "removed",
-    "commit", "history", "before", "regression", "broke", "breaking",
-    "deprecated", "replaced", "refactor", "refactored", "modified",
-    "timeline", "evolution", "previous", "originally",
+    "why",
+    "when",
+    "changed",
+    "introduced",
+    "added",
+    "removed",
+    "commit",
+    "history",
+    "before",
+    "regression",
+    "broke",
+    "breaking",
+    "deprecated",
+    "replaced",
+    "refactor",
+    "refactored",
+    "modified",
+    "timeline",
+    "evolution",
+    "previous",
+    "originally",
 }
 _ISSUE_KEYWORDS = {
-    "issue", "pr", "pull request", "discussion", "decision",
-    "design", "explains", "reason", "motivation", "requested",
-    "feature request", "bug report", "reported",
+    "issue",
+    "pr",
+    "pull request",
+    "discussion",
+    "decision",
+    "design",
+    "explains",
+    "reason",
+    "motivation",
+    "requested",
+    "feature request",
+    "bug report",
+    "reported",
 }
 _CODE_KEYWORDS = {
-    "function", "class", "method", "variable", "import", "module",
-    "implementation", "signature", "parameter", "returns", "type",
-    "how does", "what does", "where is", "defined", "called",
+    "function",
+    "class",
+    "method",
+    "variable",
+    "import",
+    "module",
+    "implementation",
+    "signature",
+    "parameter",
+    "returns",
+    "type",
+    "how does",
+    "what does",
+    "where is",
+    "defined",
+    "called",
 }
 
 

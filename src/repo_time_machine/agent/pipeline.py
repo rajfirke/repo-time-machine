@@ -92,6 +92,4 @@ class Pipeline:
             if self.has_issues:
                 issue_results = self.issue_retriever.query(question, top_k=self.top_k)
 
-        return self.answer_builder.build(
-            question, code_results, hist_results, issue_results
-        )
+        return self.answer_builder.build(question, code_results, hist_results, issue_results)

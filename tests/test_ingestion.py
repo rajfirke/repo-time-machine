@@ -2,8 +2,6 @@
 
 from pathlib import Path
 
-import pytest
-
 from repo_time_machine.ingestion.code_loader import (
     FileChunk,
     chunk_file,

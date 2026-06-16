@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from repo_time_machine.agent.llm import LLMResponse, generate
+from repo_time_machine.agent.llm import generate
 from repo_time_machine.retrieval.code_retriever import CodeResult
 from repo_time_machine.retrieval.history_retriever import HistoryResult
 from repo_time_machine.retrieval.issue_retriever import IssueResult
@@ -12,9 +12,9 @@ from repo_time_machine.retrieval.issue_retriever import IssueResult
 
 @dataclass
 class Evidence:
-    source: str      # "code", "commit", "issue"
-    reference: str   # file path, commit SHA, or issue URL
-    excerpt: str     # the relevant text snippet
+    source: str  # "code", "commit", "issue"
+    reference: str  # file path, commit SHA, or issue URL
+    excerpt: str  # the relevant text snippet
 
 
 @dataclass
@@ -32,9 +32,7 @@ class Answer:
         if self.evidence:
             lines.append("## Evidence\n")
             for ev in self.evidence:
-                lines.append(
-                    f"**[{ev.source}]** `{ev.reference}`\n```\n{ev.excerpt}\n```\n"
-                )
+                lines.append(f"**[{ev.source}]** `{ev.reference}`\n```\n{ev.excerpt}\n```\n")
 
         if self.timeline:
             lines.append("## Timeline\n")
@@ -53,11 +51,13 @@ def _code_to_evidence(results: list[CodeResult]) -> list[Evidence]:
         snippet = cr.content.strip()
         if len(snippet) > 600:
             snippet = snippet[:600] + "\n..."
-        items.append(Evidence(
-            source="code",
-            reference=cr.header(),
-            excerpt=snippet,
-        ))
+        items.append(
+            Evidence(
+                source="code",
+                reference=cr.header(),
+                excerpt=snippet,
+            )
+        )
     return items
 
 
@@ -71,11 +71,13 @@ def _history_to_evidence(results: list[HistoryResult]) -> list[Evidence]:
         if c.diff_summary:
             summary_lines = c.diff_summary.strip().split("\n")[:6]
             excerpt_parts.append("\n".join(summary_lines))
-        items.append(Evidence(
-            source="commit",
-            reference=f"{c.short_sha} ({c.date})",
-            excerpt="\n".join(excerpt_parts),
-        ))
+        items.append(
+            Evidence(
+                source="commit",
+                reference=f"{c.short_sha} ({c.date})",
+                excerpt="\n".join(excerpt_parts),
+            )
+        )
     return items
 
 
@@ -88,11 +90,13 @@ def _issue_to_evidence(results: list[IssueResult]) -> list[Evidence]:
         excerpt = f"[{tag}] {rec.title}\n{body_preview}"
         if rec.labels:
             excerpt += f"\nLabels: {', '.join(rec.labels)}"
-        items.append(Evidence(
-            source="issue",
-            reference=f"#{rec.number} ({rec.url})",
-            excerpt=excerpt,
-        ))
+        items.append(
+            Evidence(
+                source="issue",
+                reference=f"#{rec.number} ({rec.url})",
+                excerpt=excerpt,
+            )
+        )
     return items
 
 
@@ -233,14 +237,15 @@ def _fallback_answer(
             + "."
         )
     parts.append(
-        "(Ollama was not reachable — showing raw evidence. "
-        "Start Ollama for synthesized answers.)"
+        "(Ollama was not reachable — showing raw evidence. Start Ollama for synthesized answers.)"
     )
 
     return Answer(
         summary="\n\n".join(parts),
         evidence=evidence,
         timeline=timeline,
-        suggested_action="Start Ollama (`ollama serve`) and re-run this query for a synthesized answer.",
+        suggested_action=(
+            "Start Ollama (`ollama serve`) and re-run this query for a synthesized answer."
+        ),
         used_llm=False,
     )

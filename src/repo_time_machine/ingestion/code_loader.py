@@ -3,20 +3,44 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Iterator
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterator
 
 logger = logging.getLogger(__name__)
 
 SKIP_DIRS = {".git", ".venv", "venv", "node_modules", "__pycache__", "dist", "build", ".eggs"}
 TEXT_EXTENSIONS = {
-    ".py", ".js", ".ts", ".tsx", ".jsx", ".go", ".rs", ".java",
-    ".c", ".cpp", ".h", ".hpp", ".cs", ".rb", ".php", ".swift",
-    ".md", ".txt", ".rst",
-    ".yaml", ".yml", ".toml", ".json", ".cfg", ".ini",
-    ".sh", ".bash", ".zsh",
-    ".sql", ".graphql",
+    ".py",
+    ".js",
+    ".ts",
+    ".tsx",
+    ".jsx",
+    ".go",
+    ".rs",
+    ".java",
+    ".c",
+    ".cpp",
+    ".h",
+    ".hpp",
+    ".cs",
+    ".rb",
+    ".php",
+    ".swift",
+    ".md",
+    ".txt",
+    ".rst",
+    ".yaml",
+    ".yml",
+    ".toml",
+    ".json",
+    ".cfg",
+    ".ini",
+    ".sh",
+    ".bash",
+    ".zsh",
+    ".sql",
+    ".graphql",
     ".dockerfile",
 }
 ALWAYS_INCLUDE = {"Makefile", "Dockerfile", "Justfile", "Gemfile", "Rakefile"}
@@ -28,11 +52,11 @@ MAX_FILE_SIZE = 512 * 1024  # skip files larger than 512 KB
 class FileChunk:
     """A contiguous slice of a source file, ready for embedding."""
 
-    file: str          # relative path from repo root
-    start_line: int    # 1-indexed
-    end_line: int      # inclusive
+    file: str  # relative path from repo root
+    start_line: int  # 1-indexed
+    end_line: int  # inclusive
     content: str
-    language: str      # derived from extension
+    language: str  # derived from extension
 
     @property
     def loc(self) -> int:
@@ -44,15 +68,35 @@ class FileChunk:
 
 def _language_from_ext(ext: str) -> str:
     mapping = {
-        ".py": "python", ".js": "javascript", ".ts": "typescript",
-        ".tsx": "typescript", ".jsx": "javascript", ".go": "go",
-        ".rs": "rust", ".java": "java", ".c": "c", ".cpp": "cpp",
-        ".h": "c", ".hpp": "cpp", ".cs": "csharp", ".rb": "ruby",
-        ".php": "php", ".swift": "swift", ".sh": "shell",
-        ".bash": "shell", ".zsh": "shell", ".sql": "sql",
-        ".md": "markdown", ".rst": "markdown", ".txt": "text",
-        ".yaml": "yaml", ".yml": "yaml", ".toml": "toml",
-        ".json": "json", ".cfg": "ini", ".ini": "ini",
+        ".py": "python",
+        ".js": "javascript",
+        ".ts": "typescript",
+        ".tsx": "typescript",
+        ".jsx": "javascript",
+        ".go": "go",
+        ".rs": "rust",
+        ".java": "java",
+        ".c": "c",
+        ".cpp": "cpp",
+        ".h": "c",
+        ".hpp": "cpp",
+        ".cs": "csharp",
+        ".rb": "ruby",
+        ".php": "php",
+        ".swift": "swift",
+        ".sh": "shell",
+        ".bash": "shell",
+        ".zsh": "shell",
+        ".sql": "sql",
+        ".md": "markdown",
+        ".rst": "markdown",
+        ".txt": "text",
+        ".yaml": "yaml",
+        ".yml": "yaml",
+        ".toml": "toml",
+        ".json": "json",
+        ".cfg": "ini",
+        ".ini": "ini",
     }
     return mapping.get(ext, "text")
 
@@ -102,26 +146,30 @@ def chunk_file(
     lang = _language_from_ext(file_path.suffix)
 
     if len(lines) <= chunk_lines:
-        return [FileChunk(
-            file=rel_path,
-            start_line=1,
-            end_line=len(lines),
-            content=text,
-            language=lang,
-        )]
+        return [
+            FileChunk(
+                file=rel_path,
+                start_line=1,
+                end_line=len(lines),
+                content=text,
+                language=lang,
+            )
+        ]
 
     step = max(1, chunk_lines - overlap_lines)
     chunks: list[FileChunk] = []
     for start in range(0, len(lines), step):
         end = min(start + chunk_lines, len(lines))
         chunk_text = "".join(lines[start:end])
-        chunks.append(FileChunk(
-            file=rel_path,
-            start_line=start + 1,
-            end_line=end,
-            content=chunk_text,
-            language=lang,
-        ))
+        chunks.append(
+            FileChunk(
+                file=rel_path,
+                start_line=start + 1,
+                end_line=end,
+                content=chunk_text,
+                language=lang,
+            )
+        )
         if end >= len(lines):
             break
 
@@ -149,6 +197,8 @@ def ingest_repo(
 
     logger.info(
         "Ingested %d files → %d chunks from %s",
-        file_count, len(all_chunks), root,
+        file_count,
+        len(all_chunks),
+        root,
     )
     return all_chunks

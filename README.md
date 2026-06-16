@@ -1,5 +1,9 @@
 # Repo Time Machine
 
+[![CI](https://github.com/rajfirke/repo-time-machine/actions/workflows/ci.yml/badge.svg)](https://github.com/rajfirke/repo-time-machine/actions/workflows/ci.yml)
+[![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://www.python.org/downloads/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](./LICENSE)
+
 > Ask questions about your codebase — and get answers backed by code, commits, PRs, and issues together.
 
 Most "chat with your code" tools read only the current snapshot. **Repo Time Machine** treats the entire git history as searchable memory, so you can ask:
