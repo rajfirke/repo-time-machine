@@ -90,24 +90,31 @@ Build a local-first CLI that can:
 
 - `Python`
 - `Typer` for CLI
-- `FAISS` or `LanceDB`
-- `sentence-transformers` or `bge-small` embeddings
+- `FAISS` for vector search
+- `sentence-transformers` with `bge-small-en-v1.5`
 - `Ollama` with open models for local inference
 - optional GitHub API for issue/PR metadata
 
 Recommended cheap-first model path:
 
-- embeddings: `bge-small-en-v1.5` or similar
+- embeddings: `bge-small-en-v1.5` (local, free)
 - local generation: `Qwen2.5-Coder 7B` or similar via `Ollama`
-- optional API fallback: `OpenRouter` or `Groq` only when needed
+- optional API fallback: `Groq` or `OpenRouter` only when needed
 
 ## v0.1 Deliverables
 
-- repo ingestion pipeline
-- hybrid retrieval over code + history
-- local CLI for question answering
-- cited markdown response format
-- one demo against a real open source repo
+| Deliverable | Status |
+|---|---|
+| Response schema (Answer, Evidence dataclasses) | Done |
+| Repo ingestion pipeline (code_loader, git_history) | Done |
+| Hybrid retrieval over code + history | Done |
+| GitHub issue/PR enrichment | Done |
+| Question router | Done |
+| Local CLI (`rtm index`, `rtm ask`) | Done |
+| Ollama LLM integration with fallback | Done |
+| Cited markdown response format | Done |
+| 70 tests (ingestion, retrieval, agent, issues) | Done |
+| README, CONTRIBUTING, LICENSE | Done |
 
 ## Non-Goals For v0.1
 
@@ -123,11 +130,20 @@ Recommended cheap-first model path:
 - setup works on a laptop with mostly open-source tooling
 - the demo is compelling enough for GitHub and future extension
 
-## First Build Order
+## Build Order (completed)
 
-1. define the response schema
-2. build repo and git-history ingestion
-3. add code and commit retrieval
-4. add question router
-5. add optional GitHub issue/PR enrichment
-6. polish demo and docs
+1. ~~define the response schema~~
+2. ~~build repo and git-history ingestion~~
+3. ~~add code and commit retrieval~~
+4. ~~add question router~~
+5. ~~add optional GitHub issue/PR enrichment~~
+6. ~~polish demo and docs~~
+
+## Future Ideas (v0.2+)
+
+- Web UI or TUI with interactive evidence browsing
+- Support for multiple embedding models
+- Richer diff analysis (line-level blame integration)
+- Performance benchmarks on large repos (10k+ commits)
+- GitHub Actions CI workflow
+- Tag v0.1.0 release
