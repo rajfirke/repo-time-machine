@@ -77,11 +77,24 @@ class CodeRetriever:
         meta_path = self.index_dir / self.META_FILE
         if not idx_path.exists() or not meta_path.exists():
             return False
-        self._index = faiss.read_index(str(idx_path))
-        with open(meta_path, encoding="utf-8") as f:
-            self._meta = json.load(f)
-        logger.info("Loaded code index: %d vectors", self._index.ntotal)
-        return True
+        try:
+            index = faiss.read_index(str(idx_path))
+            with open(meta_path, encoding="utf-8") as f:
+                meta = json.load(f)
+            if index.ntotal != len(meta):
+                logger.error(
+                    "Code index mismatch: %d vectors vs %d metadata entries — re-run `rtm index`",
+                    index.ntotal,
+                    len(meta),
+                )
+                return False
+            self._index = index
+            self._meta = meta
+            logger.info("Loaded code index: %d vectors", self._index.ntotal)
+            return True
+        except (json.JSONDecodeError, OSError, RuntimeError) as exc:
+            logger.error("Failed to load code index: %s", exc)
+            return False
 
     def query(self, question: str, top_k: int = 5) -> list[CodeResult]:
         """Return the top-k most relevant code chunks for the question."""

@@ -11,6 +11,8 @@ logger = logging.getLogger(__name__)
 RTM_DIR = ".rtm"
 CONFIG_FILE = "config.json"
 
+REQUIRED_INDEX_FILES = ("code.faiss", "code_meta.json", "commits.faiss", "commits_meta.json")
+
 
 def rtm_dir(repo_path: str | Path) -> Path:
     """Return the .rtm/ directory path for a given repo."""
@@ -33,14 +35,25 @@ def save_config(repo_path: str | Path, config: dict) -> None:
 
 
 def load_config(repo_path: str | Path) -> dict | None:
-    """Read index configuration. Returns None if not indexed yet."""
+    """Read index configuration. Returns None if corrupt or missing."""
     cfg = rtm_dir(repo_path) / CONFIG_FILE
     if not cfg.exists():
         return None
-    with open(cfg, encoding="utf-8") as f:
-        return json.load(f)
+    try:
+        with open(cfg, encoding="utf-8") as f:
+            return json.load(f)
+    except (json.JSONDecodeError, OSError) as exc:
+        logger.warning("Corrupt config at %s: %s", cfg, exc)
+        return None
 
 
 def is_indexed(repo_path: str | Path) -> bool:
-    """Check whether a repo has been indexed by looking for .rtm/config.json."""
-    return (rtm_dir(repo_path) / CONFIG_FILE).exists()
+    """Check whether a repo has been fully indexed.
+
+    Verifies config.json exists AND at least the core FAISS index files
+    are present (code + commits). Issue indexes are optional.
+    """
+    d = rtm_dir(repo_path)
+    if not (d / CONFIG_FILE).exists():
+        return False
+    return all((d / f).exists() for f in REQUIRED_INDEX_FILES)

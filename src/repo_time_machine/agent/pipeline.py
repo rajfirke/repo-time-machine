@@ -39,6 +39,7 @@ class Pipeline:
     ):
         self.repo = Path(repo_path).resolve()
         self.top_k = top_k
+        self._load_errors: list[str] = []
 
         rtm_path = ensure_rtm_dir(self.repo)
         cfg = load_config(self.repo) or {}
@@ -51,17 +52,40 @@ class Pipeline:
         self.issue_retriever = IssueRetriever(rtm_path, embedder, repo_slug=github_slug or "")
         self.answer_builder = AnswerBuilder(model=llm_model)
 
-        self._code_loaded = self.code_retriever.load()
-        self._hist_loaded = self.hist_retriever.load()
-        self._issues_loaded = self.issue_retriever.load()
+        self._code_loaded = self._safe_load(self.code_retriever, "code")
+        self._hist_loaded = self._safe_load(self.hist_retriever, "history")
+        self._issues_loaded = self._safe_load(self.issue_retriever, "issues")
+
+    def _safe_load(self, retriever: object, label: str) -> bool:
+        """Load a retriever index, catching any unexpected errors."""
+        try:
+            loaded = retriever.load()  # type: ignore[union-attr]
+            if not loaded:
+                logger.warning("Could not load %s index", label)
+            return loaded
+        except Exception as exc:
+            msg = f"{label} index failed to load: {exc}"
+            logger.error(msg)
+            self._load_errors.append(msg)
+            return False
 
     @property
     def ready(self) -> bool:
-        return self._code_loaded and self._hist_loaded
+        """True if at least one retriever loaded successfully."""
+        return self._code_loaded or self._hist_loaded
 
     @property
     def has_issues(self) -> bool:
         return self._issues_loaded and self.issue_retriever.available
+
+    @property
+    def load_errors(self) -> list[str]:
+        return list(self._load_errors)
+
+    @property
+    def partial(self) -> bool:
+        """True when some (but not all) core indexes loaded."""
+        return self.ready and not (self._code_loaded and self._hist_loaded)
 
     def ask(self, question: str, skip_llm: bool = False) -> Answer:
         """Run the full pipeline and return a structured Answer."""
