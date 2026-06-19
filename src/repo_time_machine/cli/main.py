@@ -90,6 +90,7 @@ def index(
         repo,
         {
             "model": model,
+            "embed_dim": embedder.dim,
             "chunk_lines": chunk_lines,
             "overlap": overlap,
             "max_commits": max_commits,
@@ -151,7 +152,16 @@ def ask(
     pipeline = Pipeline(repo_path=repo, llm_model=llm_model, top_k=top_k)
     if not pipeline.ready:
         console.print("[red]Error:[/red] Could not load indexes. Re-run [bold]rtm index[/bold].")
+        for err in pipeline.load_errors:
+            console.print(f"  [dim]{err}[/dim]")
         raise typer.Exit(1)
+
+    if pipeline.partial:
+        console.print(
+            "[yellow]Warning:[/yellow] Only partial indexes loaded; results may be limited."
+        )
+        for err in pipeline.load_errors:
+            console.print(f"  [dim]{err}[/dim]")
 
     if pipeline.has_issues:
         console.print("[dim]GitHub issues/PRs available for enrichment[/dim]")

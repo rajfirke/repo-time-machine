@@ -100,12 +100,25 @@ class IssueRetriever:
         meta_path = self.index_dir / self.META_FILE
         if not idx_path.exists() or not meta_path.exists():
             return False
-        self._index = faiss.read_index(str(idx_path))
-        with open(meta_path, encoding="utf-8") as f:
-            raw = json.load(f)
-        self._records = [IssueRecord(**r) for r in raw]
-        logger.info("Loaded issue index: %d items", self._index.ntotal)
-        return True
+        try:
+            index = faiss.read_index(str(idx_path))
+            with open(meta_path, encoding="utf-8") as f:
+                raw = json.load(f)
+            records = [IssueRecord(**r) for r in raw]
+            if index.ntotal != len(records):
+                logger.error(
+                    "Issue index mismatch: %d vectors vs %d records — re-run `rtm index`",
+                    index.ntotal,
+                    len(records),
+                )
+                return False
+            self._index = index
+            self._records = records
+            logger.info("Loaded issue index: %d items", self._index.ntotal)
+            return True
+        except (json.JSONDecodeError, OSError, RuntimeError, TypeError) as exc:
+            logger.error("Failed to load issue index: %s", exc)
+            return False
 
     def query(self, question: str, top_k: int = 5) -> list[IssueResult]:
         """Return the top-k most relevant issues/PRs."""

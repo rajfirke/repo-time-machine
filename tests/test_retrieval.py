@@ -228,11 +228,110 @@ class TestStore:
         assert not is_indexed(repo)
 
         save_config(repo, {"model": "test", "chunks": 5})
+        # config exists but FAISS files are missing — should NOT be considered indexed
+        assert not is_indexed(repo)
+
+    def test_is_indexed_with_all_files(self, tmp_path):
+        repo = tmp_path / "myrepo"
+        repo.mkdir()
+        save_config(repo, {"model": "test"})
+        rtm = repo / ".rtm"
+        for name in ("code.faiss", "code_meta.json", "commits.faiss", "commits_meta.json"):
+            (rtm / name).write_text("x")
         assert is_indexed(repo)
 
-        cfg = load_config(repo)
-        assert cfg["model"] == "test"
-        assert cfg["chunks"] == 5
+    def test_load_config_corrupt_json(self, tmp_path):
+        repo = tmp_path / "myrepo"
+        repo.mkdir()
+        rtm = repo / ".rtm"
+        rtm.mkdir()
+        (rtm / "config.json").write_text("{broken json!!!")
+        assert load_config(repo) is None
 
     def test_load_missing(self, tmp_path):
         assert load_config(tmp_path / "nope") is None
+
+
+# ---------------------------------------------------------------------------
+# Index consistency validation
+# ---------------------------------------------------------------------------
+
+
+class TestIndexConsistency:
+    def test_code_load_rejects_meta_mismatch(self, tmp_path):
+        """When FAISS vector count != metadata length, load() returns False."""
+        embedder = _fake_embedder()
+        rtm = tmp_path / ".rtm"
+        ret = CodeRetriever(rtm, embedder)
+        ret.build(_sample_chunks())  # 3 chunks
+
+        import json
+
+        meta_path = rtm / "code_meta.json"
+        with open(meta_path) as f:
+            meta = json.load(f)
+        meta.pop()  # remove one entry to create mismatch
+        with open(meta_path, "w") as f:
+            json.dump(meta, f)
+
+        ret2 = CodeRetriever(rtm, embedder)
+        assert ret2.load() is False
+
+    def test_history_load_rejects_meta_mismatch(self, tmp_path):
+        embedder = _fake_embedder()
+        rtm = tmp_path / ".rtm"
+        ret = HistoryRetriever(rtm, embedder)
+        ret.build(_sample_commits())
+
+        import json
+
+        meta_path = rtm / "commits_meta.json"
+        with open(meta_path) as f:
+            meta = json.load(f)
+        meta.pop()
+        with open(meta_path, "w") as f:
+            json.dump(meta, f)
+
+        ret2 = HistoryRetriever(rtm, embedder)
+        assert ret2.load() is False
+
+    def test_code_load_handles_corrupt_json(self, tmp_path):
+        embedder = _fake_embedder()
+        rtm = tmp_path / ".rtm"
+        ret = CodeRetriever(rtm, embedder)
+        ret.build(_sample_chunks())
+
+        (rtm / "code_meta.json").write_text("{corrupt!!!")
+        ret2 = CodeRetriever(rtm, embedder)
+        assert ret2.load() is False
+
+    def test_history_load_handles_corrupt_json(self, tmp_path):
+        embedder = _fake_embedder()
+        rtm = tmp_path / ".rtm"
+        ret = HistoryRetriever(rtm, embedder)
+        ret.build(_sample_commits())
+
+        (rtm / "commits_meta.json").write_text("{corrupt!!!")
+        ret2 = HistoryRetriever(rtm, embedder)
+        assert ret2.load() is False
+
+    def test_code_load_handles_corrupt_faiss(self, tmp_path):
+        embedder = _fake_embedder()
+        rtm = tmp_path / ".rtm"
+        ret = CodeRetriever(rtm, embedder)
+        ret.build(_sample_chunks())
+
+        (rtm / "code.faiss").write_text("not a faiss file")
+        ret2 = CodeRetriever(rtm, embedder)
+        assert ret2.load() is False
+
+    def test_valid_load_still_works(self, tmp_path):
+        embedder = _fake_embedder()
+        rtm = tmp_path / ".rtm"
+        ret = CodeRetriever(rtm, embedder)
+        ret.build(_sample_chunks())
+
+        ret2 = CodeRetriever(rtm, embedder)
+        assert ret2.load() is True
+        results = ret2.query("hello", top_k=1)
+        assert len(results) == 1
