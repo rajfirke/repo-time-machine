@@ -157,9 +157,11 @@ def ask(
         console.print("[dim]GitHub issues/PRs available for enrichment[/dim]")
 
     with console.status("[dim]Thinking...[/dim]"):
-        answer = pipeline.ask(question)
+        answer = pipeline.ask(question, skip_llm=raw)
 
-    if answer.used_llm:
+    if raw:
+        console.print("[cyan]Raw evidence mode (--raw)[/cyan]\n")
+    elif answer.used_llm:
         console.print("[green]LLM-synthesized answer[/green]\n")
     else:
         console.print("[yellow]Evidence-only answer (Ollama not running)[/yellow]\n")
