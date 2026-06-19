@@ -63,7 +63,7 @@ class Pipeline:
     def has_issues(self) -> bool:
         return self._issues_loaded and self.issue_retriever.available
 
-    def ask(self, question: str) -> Answer:
+    def ask(self, question: str, skip_llm: bool = False) -> Answer:
         """Run the full pipeline and return a structured Answer."""
         qtype = classify(question)
         logger.info("Question classified as: %s", qtype.value)
@@ -92,4 +92,6 @@ class Pipeline:
             if self.has_issues:
                 issue_results = self.issue_retriever.query(question, top_k=self.top_k)
 
-        return self.answer_builder.build(question, code_results, hist_results, issue_results)
+        return self.answer_builder.build(
+            question, code_results, hist_results, issue_results, skip_llm=skip_llm
+        )

@@ -158,6 +158,7 @@ class AnswerBuilder:
         code_results: list[CodeResult],
         hist_results: list[HistoryResult],
         issue_results: list[IssueResult] | None = None,
+        skip_llm: bool = False,
     ) -> Answer:
         code_evidence = _code_to_evidence(code_results)
         hist_evidence = _history_to_evidence(hist_results)
@@ -170,6 +171,9 @@ class AnswerBuilder:
                 summary="No relevant evidence found in the indexed repository.",
                 used_llm=False,
             )
+
+        if skip_llm:
+            return _fallback_answer(question, all_evidence, timeline, raw=True)
 
         evidence_block = _format_evidence_block(all_evidence)
         prompt = (
@@ -211,6 +215,7 @@ def _fallback_answer(
     question: str,
     evidence: list[Evidence],
     timeline: list[str],
+    raw: bool = False,
 ) -> Answer:
     """Build an answer without an LLM — just structured evidence."""
     code_refs = [e for e in evidence if e.source == "code"]
@@ -236,16 +241,20 @@ def _fallback_answer(
             + ", ".join(f"`{e.reference}`" for e in issue_refs[:3])
             + "."
         )
-    parts.append(
-        "(Ollama was not reachable — showing raw evidence. Start Ollama for synthesized answers.)"
-    )
+
+    if raw:
+        action = "Run without `--raw` to get an LLM-synthesized answer."
+    else:
+        parts.append(
+            "(Ollama was not reachable — showing raw evidence."
+            " Start Ollama for synthesized answers.)"
+        )
+        action = "Start Ollama (`ollama serve`) and re-run this query for a synthesized answer."
 
     return Answer(
         summary="\n\n".join(parts),
         evidence=evidence,
         timeline=timeline,
-        suggested_action=(
-            "Start Ollama (`ollama serve`) and re-run this query for a synthesized answer."
-        ),
+        suggested_action=action,
         used_llm=False,
     )

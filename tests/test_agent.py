@@ -218,6 +218,32 @@ class TestAnswerBuilder:
         assert not answer.used_llm
         assert "Ollama" in answer.suggested_action
 
+    def test_skip_llm_returns_raw_evidence(self):
+        builder = AnswerBuilder(model="test")
+        answer = builder.build(
+            "Why was validation added?",
+            _sample_code_results(),
+            _sample_hist_results(),
+            skip_llm=True,
+        )
+        assert not answer.used_llm
+        assert "code section" in answer.summary
+        assert "commit" in answer.summary
+        assert "--raw" in answer.suggested_action
+        assert len(answer.evidence) > 0
+        assert len(answer.timeline) > 0
+
+    def test_skip_llm_never_calls_generate(self):
+        builder = AnswerBuilder(model="test")
+        with patch("repo_time_machine.agent.answer.generate") as mock_gen:
+            builder.build(
+                "Why?",
+                _sample_code_results(),
+                _sample_hist_results(),
+                skip_llm=True,
+            )
+            mock_gen.assert_not_called()
+
     def test_empty_evidence(self):
         builder = AnswerBuilder(model="test")
         answer = builder.build("Why?", [], [])
