@@ -6,6 +6,7 @@ import logging
 from dataclasses import dataclass, field
 from pathlib import Path
 
+import git
 from git import Repo
 from git.exc import GitCommandError, InvalidGitRepositoryError
 
@@ -35,7 +36,7 @@ def _diff_summary(commit) -> str:
     try:
         parent = commit.parents[0] if commit.parents else None
         if parent is None:
-            diffs = commit.diff(None, create_patch=False)
+            diffs = commit.diff(git.NULL_TREE, create_patch=False)
         else:
             diffs = parent.diff(commit, create_patch=False)
 
@@ -60,7 +61,7 @@ def _files_from_commit(commit) -> list[str]:
     try:
         parent = commit.parents[0] if commit.parents else None
         if parent is None:
-            diffs = commit.diff(None)
+            diffs = commit.diff(git.NULL_TREE)
         else:
             diffs = parent.diff(commit)
         paths: list[str] = []
