@@ -2,6 +2,8 @@
 
 from pathlib import Path
 
+from git import Repo
+
 from repo_time_machine.ingestion.code_loader import (
     FileChunk,
     chunk_file,
@@ -11,6 +13,8 @@ from repo_time_machine.ingestion.code_loader import (
 )
 from repo_time_machine.ingestion.git_history import (
     CommitRecord,
+    _diff_summary,
+    _files_from_commit,
     extract_history,
     file_timeline,
 )
@@ -146,3 +150,61 @@ class TestFileTimeline:
     def test_nonexistent_file_returns_empty(self):
         records = file_timeline(REPO_ROOT, "does_not_exist.xyz")
         assert records == []
+
+
+# ---------------------------------------------------------------------------
+# Initial commit diff correctness (issue #6)
+# ---------------------------------------------------------------------------
+
+
+class TestInitialCommitDiff:
+    """Verify that initial commits diff against the empty tree, not the working tree."""
+
+    def _make_repo_with_initial_commit(self, tmp_path: Path) -> Repo:
+        """Create a repo with one commit containing exactly one file."""
+        repo = Repo.init(tmp_path)
+        repo.config_writer().set_value("user", "name", "Test").release()
+        repo.config_writer().set_value("user", "email", "test@test.com").release()
+        hello = tmp_path / "hello.txt"
+        hello.write_text("hello world\n")
+        repo.index.add(["hello.txt"])
+        repo.index.commit("initial commit")
+        return repo
+
+    def test_files_from_initial_commit_only_lists_committed_files(self, tmp_path):
+        repo = self._make_repo_with_initial_commit(tmp_path)
+        (tmp_path / "untracked.txt").write_text("noise")
+        initial = list(repo.iter_commits())[-1]
+        files = _files_from_commit(initial)
+        assert files == ["hello.txt"]
+
+    def test_diff_summary_initial_commit_only_shows_committed_files(self, tmp_path):
+        repo = self._make_repo_with_initial_commit(tmp_path)
+        (tmp_path / "untracked.txt").write_text("noise")
+        initial = list(repo.iter_commits())[-1]
+        summary = _diff_summary(initial)
+        assert "hello.txt" in summary
+        assert "untracked.txt" not in summary
+
+    def test_initial_commit_files_not_inflated_by_later_commits(self, tmp_path):
+        repo = self._make_repo_with_initial_commit(tmp_path)
+        second = tmp_path / "second.txt"
+        second.write_text("added later\n")
+        repo.index.add(["second.txt"])
+        repo.index.commit("add second file")
+
+        initial = list(repo.iter_commits())[-1]
+        files = _files_from_commit(initial)
+        assert files == ["hello.txt"], f"Initial commit should only touch hello.txt, got {files}"
+
+    def test_extract_history_initial_commit_correct(self, tmp_path):
+        repo = self._make_repo_with_initial_commit(tmp_path)
+        (tmp_path / "extra.py").write_text("x = 1\n")
+        repo.index.add(["extra.py"])
+        repo.index.commit("add extra")
+
+        records = extract_history(tmp_path)
+        initial = records[-1]
+        assert initial.files_changed == ["hello.txt"]
+        assert "hello.txt" in initial.diff_summary
+        assert "extra.py" not in initial.diff_summary
