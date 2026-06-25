@@ -104,6 +104,12 @@ def extract_history(
         logger.error("Not a git repository: %s", repo_path)
         return []
 
+    try:
+        repo.head.commit
+    except ValueError:
+        logger.warning("Repository has no commits: %s", repo_path)
+        return []
+
     if repo.head.is_detached:
         ref = repo.head.commit
     elif branch:
@@ -132,6 +138,12 @@ def file_timeline(
         repo = Repo(repo_path)
     except InvalidGitRepositoryError:
         logger.error("Not a git repository: %s", repo_path)
+        return []
+
+    try:
+        repo.head.commit
+    except ValueError:
+        logger.warning("Repository has no commits: %s", repo_path)
         return []
 
     records: list[CommitRecord] = []

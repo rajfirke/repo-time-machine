@@ -208,3 +208,29 @@ class TestInitialCommitDiff:
         assert initial.files_changed == ["hello.txt"]
         assert "hello.txt" in initial.diff_summary
         assert "extra.py" not in initial.diff_summary
+
+
+# ---------------------------------------------------------------------------
+# Empty repository handling (issue #7)
+# ---------------------------------------------------------------------------
+
+
+class TestEmptyRepoHandling:
+    """Verify that functions return empty lists instead of crashing on repos with no commits."""
+
+    def test_extract_history_empty_repo_returns_empty(self, tmp_path):
+        Repo.init(tmp_path)
+        records = extract_history(tmp_path)
+        assert records == []
+
+    def test_file_timeline_empty_repo_returns_empty(self, tmp_path):
+        Repo.init(tmp_path)
+        records = file_timeline(tmp_path, "anything.py")
+        assert records == []
+
+    def test_extract_history_empty_repo_does_not_raise(self, tmp_path):
+        Repo.init(tmp_path)
+        try:
+            extract_history(tmp_path)
+        except Exception as exc:
+            raise AssertionError(f"extract_history raised {type(exc).__name__}: {exc}")
