@@ -32,57 +32,53 @@ class CommitRecord:
         return f"{self.short_sha} {self.date} {first_line}"
 
 
-def _diff_summary(commit) -> str:
-    """Build a compact diff summary for a commit (insertions/deletions per file)."""
-    try:
-        parent = commit.parents[0] if commit.parents else None
-        if parent is None:
-            diffs = commit.diff(git.NULL_TREE, create_patch=False)
-        else:
-            diffs = parent.diff(commit, create_patch=False)
-
-        lines = []
-        for d in diffs:
-            action = "M"
-            if d.new_file:
-                action = "A"
-            elif d.deleted_file:
-                action = "D"
-            elif d.renamed_file:
-                action = "R"
-            path = d.b_path or d.a_path or "?"
-            lines.append(f"{action} {path}")
-        return "\n".join(lines)
-    except (GitCommandError, ValueError):
-        return ""
+def _compute_diffs(commit):
+    """Compute the diff for a commit against its first parent (or empty tree for root commits)."""
+    parent = commit.parents[0] if commit.parents else None
+    if parent is None:
+        return commit.diff(git.NULL_TREE)
+    return parent.diff(commit)
 
 
-def _files_from_commit(commit) -> list[str]:
-    """Return list of file paths touched by a commit."""
-    try:
-        parent = commit.parents[0] if commit.parents else None
-        if parent is None:
-            diffs = commit.diff(git.NULL_TREE)
-        else:
-            diffs = parent.diff(commit)
-        paths: list[str] = []
-        for d in diffs:
-            p = d.b_path or d.a_path
-            if p and p not in paths:
-                paths.append(p)
-        return paths
-    except (GitCommandError, ValueError):
-        return []
+def _format_diffs(diffs) -> str:
+    """Build a compact diff summary (action + path per file) from a pre-computed diff list."""
+    lines = []
+    for d in diffs:
+        action = "M"
+        if d.new_file:
+            action = "A"
+        elif d.deleted_file:
+            action = "D"
+        elif d.renamed_file:
+            action = "R"
+        path = d.b_path or d.a_path or "?"
+        lines.append(f"{action} {path}")
+    return "\n".join(lines)
+
+
+def _files_from_diffs(diffs) -> list[str]:
+    """Extract unique file paths from a pre-computed diff list."""
+    paths: list[str] = []
+    for d in diffs:
+        p = d.b_path or d.a_path
+        if p and p not in paths:
+            paths.append(p)
+    return paths
 
 
 def _to_record(commit) -> CommitRecord:
+    try:
+        diffs = _compute_diffs(commit)
+    except (GitCommandError, ValueError):
+        diffs = []
+
     return CommitRecord(
         sha=commit.hexsha,
         author=str(commit.author),
         date=commit.committed_datetime.astimezone(UTC).strftime("%Y-%m-%d %H:%M:%S"),
         message=commit.message.strip(),
-        files_changed=_files_from_commit(commit),
-        diff_summary=_diff_summary(commit),
+        files_changed=_files_from_diffs(diffs),
+        diff_summary=_format_diffs(diffs),
     )
 
 

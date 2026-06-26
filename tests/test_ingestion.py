@@ -1,6 +1,7 @@
 """Tests for the ingestion pipeline — runs against the repo-time-machine repo itself."""
 
 from pathlib import Path
+from unittest.mock import patch
 
 from git import Repo
 
@@ -13,8 +14,9 @@ from repo_time_machine.ingestion.code_loader import (
 )
 from repo_time_machine.ingestion.git_history import (
     CommitRecord,
-    _diff_summary,
-    _files_from_commit,
+    _compute_diffs,
+    _files_from_diffs,
+    _format_diffs,
     extract_history,
     file_timeline,
 )
@@ -175,14 +177,16 @@ class TestInitialCommitDiff:
         repo = self._make_repo_with_initial_commit(tmp_path)
         (tmp_path / "untracked.txt").write_text("noise")
         initial = list(repo.iter_commits())[-1]
-        files = _files_from_commit(initial)
+        diffs = _compute_diffs(initial)
+        files = _files_from_diffs(diffs)
         assert files == ["hello.txt"]
 
     def test_diff_summary_initial_commit_only_shows_committed_files(self, tmp_path):
         repo = self._make_repo_with_initial_commit(tmp_path)
         (tmp_path / "untracked.txt").write_text("noise")
         initial = list(repo.iter_commits())[-1]
-        summary = _diff_summary(initial)
+        diffs = _compute_diffs(initial)
+        summary = _format_diffs(diffs)
         assert "hello.txt" in summary
         assert "untracked.txt" not in summary
 
@@ -194,7 +198,8 @@ class TestInitialCommitDiff:
         repo.index.commit("add second file")
 
         initial = list(repo.iter_commits())[-1]
-        files = _files_from_commit(initial)
+        diffs = _compute_diffs(initial)
+        files = _files_from_diffs(diffs)
         assert files == ["hello.txt"], f"Initial commit should only touch hello.txt, got {files}"
 
     def test_extract_history_initial_commit_correct(self, tmp_path):
@@ -234,3 +239,64 @@ class TestEmptyRepoHandling:
             extract_history(tmp_path)
         except Exception as exc:
             raise AssertionError(f"extract_history raised {type(exc).__name__}: {exc}")
+
+
+# ---------------------------------------------------------------------------
+# Deduplicated diff computation (issue #8)
+# ---------------------------------------------------------------------------
+
+
+class TestDeduplicatedDiff:
+    """Verify that diff is computed once per commit and helpers produce correct output."""
+
+    def _make_repo(self, tmp_path: Path) -> Repo:
+        repo = Repo.init(tmp_path)
+        repo.config_writer().set_value("user", "name", "Test").release()
+        repo.config_writer().set_value("user", "email", "test@test.com").release()
+        (tmp_path / "a.txt").write_text("hello\n")
+        repo.index.add(["a.txt"])
+        repo.index.commit("add a")
+        (tmp_path / "b.txt").write_text("world\n")
+        repo.index.add(["b.txt"])
+        repo.index.commit("add b")
+        return repo
+
+    def test_format_diffs_produces_action_lines(self, tmp_path):
+        repo = self._make_repo(tmp_path)
+        commit = list(repo.iter_commits())[0]
+        diffs = _compute_diffs(commit)
+        summary = _format_diffs(diffs)
+        assert "b.txt" in summary
+
+    def test_files_from_diffs_extracts_paths(self, tmp_path):
+        repo = self._make_repo(tmp_path)
+        commit = list(repo.iter_commits())[0]
+        diffs = _compute_diffs(commit)
+        files = _files_from_diffs(diffs)
+        assert "b.txt" in files
+
+    def test_record_files_and_summary_consistent(self, tmp_path):
+        repo = self._make_repo(tmp_path)
+        commit = list(repo.iter_commits())[0]
+        diffs = _compute_diffs(commit)
+        files = _files_from_diffs(diffs)
+        summary = _format_diffs(diffs)
+        for f in files:
+            assert f in summary, f"{f} in files_changed but not in diff_summary"
+
+    def test_diff_computed_once_per_commit(self, tmp_path):
+        """Patch _compute_diffs to count calls — should be exactly once per commit."""
+        self._make_repo(tmp_path)
+        with patch(
+            "repo_time_machine.ingestion.git_history._compute_diffs",
+            wraps=_compute_diffs,
+        ) as mock_diff:
+            records = extract_history(tmp_path)
+            assert len(records) == 2
+            assert mock_diff.call_count == 2, (
+                f"Expected 2 diff calls for 2 commits, got {mock_diff.call_count}"
+            )
+
+    def test_empty_diffs_produce_empty_outputs(self):
+        assert _format_diffs([]) == ""
+        assert _files_from_diffs([]) == []
