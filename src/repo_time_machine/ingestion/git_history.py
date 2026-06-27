@@ -79,9 +79,7 @@ def _to_record(commit) -> CommitRecord:
     return CommitRecord(
         sha=commit.hexsha,
         author=str(commit.author),
-        date=commit.committed_datetime.astimezone(UTC).strftime(
-            "%Y-%m-%d %H:%M:%S"
-        ),
+        date=commit.committed_datetime.astimezone(UTC).strftime("%Y-%m-%d %H:%M:%S"),
         message=commit.message.strip(),
         files_changed=_files_from_commit(commit),
         diff_summary=_diff_summary(commit),
