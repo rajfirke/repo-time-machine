@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
 
 from repo_time_machine.agent.llm import generate
@@ -196,18 +197,26 @@ class AnswerBuilder:
         return _fallback_answer(question, all_evidence, timeline)
 
 
+_ACTION_RE = re.compile(
+    r"^#{0,3}\s*(?:\d+[\.\)]\s*)?"
+    r"(?:suggested\s+(?:next\s+)?action|next\s+(?:action|step))s?"
+    r"\s*:?\s*$",
+    re.MULTILINE | re.IGNORECASE,
+)
+
+
 def _split_llm_response(text: str) -> tuple[str, str]:
-    """Split LLM output into (summary, suggested_action)."""
-    lower = text.lower()
-    for marker in ["suggested next action", "suggested action", "next action", "next step"]:
-        idx = lower.find(marker)
-        if idx != -1:
-            newline = text.find("\n", idx)
-            if newline == -1:
-                newline = idx + len(marker)
-            summary = text[:idx].strip().rstrip(":#-")
-            action = text[newline:].strip().lstrip(":#- ")
-            return summary, action
+    """Split LLM output into (summary, suggested_action).
+
+    Only splits on markers that appear as standalone section headers at
+    the start of a line (e.g. ``## Suggested Action:``), not when the
+    phrase appears mid-sentence in narrative text.
+    """
+    match = _ACTION_RE.search(text)
+    if match:
+        summary = text[: match.start()].strip().rstrip(":#-")
+        action = text[match.end() :].strip()
+        return summary, action
     return text.strip(), ""
 
 

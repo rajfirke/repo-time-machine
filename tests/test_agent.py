@@ -160,6 +160,36 @@ class TestSplitLLMResponse:
         assert summary == text
         assert action == ""
 
+    def test_no_false_positive_on_narrative_text(self):
+        text = "The suggested action was to refactor the parser module for better performance."
+        summary, action = _split_llm_response(text)
+        assert summary == text
+        assert action == ""
+
+    def test_no_false_positive_on_mid_sentence_next_step(self):
+        text = "A good next step would be adding validation to the input handler."
+        summary, action = _split_llm_response(text)
+        assert summary == text
+        assert action == ""
+
+    def test_splits_on_markdown_header(self):
+        text = "The function validates input.\n\n## Suggested Action\nAdd edge case tests."
+        summary, action = _split_llm_response(text)
+        assert "validates input" in summary
+        assert "edge case" in action
+
+    def test_splits_on_numbered_action(self):
+        text = "Answer here.\n\n2. Suggested next action:\nRefactor the module."
+        summary, action = _split_llm_response(text)
+        assert "Answer here" in summary
+        assert "Refactor" in action
+
+    def test_splits_on_next_step_header(self):
+        text = "The bug was introduced in commit abc.\n\nNext step:\nCheck related tests."
+        summary, action = _split_llm_response(text)
+        assert "bug was introduced" in summary
+        assert "Check related" in action
+
 
 # ---------------------------------------------------------------------------
 # Fallback answer (no LLM) tests
