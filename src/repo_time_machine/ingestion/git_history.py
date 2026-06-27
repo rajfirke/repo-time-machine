@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
+from datetime import UTC
 from pathlib import Path
 
 import git
@@ -78,7 +79,9 @@ def _to_record(commit) -> CommitRecord:
     return CommitRecord(
         sha=commit.hexsha,
         author=str(commit.author),
-        date=commit.committed_datetime.strftime("%Y-%m-%d %H:%M:%S"),
+        date=commit.committed_datetime.astimezone(UTC).strftime(
+            "%Y-%m-%d %H:%M:%S"
+        ),
         message=commit.message.strip(),
         files_changed=_files_from_commit(commit),
         diff_summary=_diff_summary(commit),
