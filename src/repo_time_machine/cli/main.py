@@ -1,7 +1,8 @@
-"""CLI commands: index and ask."""
+"""CLI commands: index, ask, and status."""
 
 from __future__ import annotations
 
+import json
 import time
 from pathlib import Path
 
@@ -16,7 +17,7 @@ from repo_time_machine.retrieval.code_retriever import CodeRetriever
 from repo_time_machine.retrieval.embeddings import get_embedder
 from repo_time_machine.retrieval.history_retriever import HistoryRetriever
 from repo_time_machine.retrieval.issue_retriever import IssueRetriever
-from repo_time_machine.retrieval.store import ensure_rtm_dir, is_indexed, save_config
+from repo_time_machine.retrieval.store import ensure_rtm_dir, index_health, is_indexed, save_config
 
 console = Console()
 app = typer.Typer(
@@ -113,6 +114,86 @@ def index(
     table.add_row("Index location", str(rtm_path))
     table.add_row("Embedding model", model)
     console.print(table)
+
+
+def _human_size(n: int) -> str:
+    for unit in ("B", "KB", "MB", "GB"):
+        if abs(n) < 1024:
+            return f"{n:.0f} {unit}" if unit == "B" else f"{n:.1f} {unit}"
+        n /= 1024  # type: ignore[assignment]
+    return f"{n:.1f} TB"
+
+
+@app.command()
+def status(
+    repo_path: str = typer.Option(".", "--repo", "-r", help="Path to repository."),
+    as_json: bool = typer.Option(False, "--json", "-j", help="Output as JSON."),
+):
+    """Show index health, configuration, and diagnostics."""
+    repo = Path(repo_path).resolve()
+    health = index_health(repo)
+
+    if as_json:
+        print(json.dumps(health.to_dict(), indent=2))  # noqa: T201
+        raise typer.Exit(0 if health.indexed else 1)
+
+    if not health.indexed:
+        console.print(
+            f"\n[yellow]⚠ Repository has not been indexed yet.[/yellow]\n"
+            f"  Run: [bold]rtm index {repo}[/bold]\n"
+        )
+        raise typer.Exit(1)
+
+    cfg = health.config
+
+    info = Table(title="Repo Time Machine Status", show_lines=True)
+    info.add_column("Property", style="bold")
+    info.add_column("Value")
+
+    info.add_row("Repository", str(repo))
+    info.add_row("Index location", str(health.rtm_path))
+    info.add_row("Embedding model", cfg.get("model", "unknown"))
+    if cfg.get("embed_dim"):
+        info.add_row("Embedding dim", str(cfg["embed_dim"]))
+    chunk_l, overlap_l = cfg.get("chunk_lines", "?"), cfg.get("overlap", "?")
+    info.add_row("Chunk config", f"{chunk_l} lines, {overlap_l} overlap")
+
+    info.add_row("Code chunks", str(cfg.get("code_chunks", "?")))
+    info.add_row("Commits indexed", str(cfg.get("commits_indexed", "?")))
+    slug = cfg.get("github_slug", "")
+    if slug:
+        info.add_row("GitHub slug", slug)
+        info.add_row("Issues/PRs indexed", str(cfg.get("issues_indexed", 0)))
+    else:
+        info.add_row("GitHub enrichment", "[dim]not configured[/dim]")
+
+    console.print()
+    console.print(info)
+
+    files_table = Table(title="Index Files", show_lines=True)
+    files_table.add_column("File", style="bold")
+    files_table.add_column("Status")
+    files_table.add_column("Size", justify="right")
+    files_table.add_column("Required")
+
+    for fh in health.files:
+        mark = "[green]✓ present[/green]" if fh.present else "[red]✗ missing[/red]"
+        size = _human_size(fh.size_bytes) if fh.present else "-"
+        req = "yes" if fh.required else "optional"
+        files_table.add_row(fh.name, mark, size, req)
+
+    console.print(files_table)
+
+    if health.healthy:
+        console.print("\n[green]Index is healthy — all required files present.[/green]\n")
+    else:
+        missing = [f.name for f in health.files if f.required and not f.present]
+        console.print(
+            f"\n[red]⚠ Index is incomplete:[/red] missing {', '.join(missing)}\n"
+            f"  Re-run: [bold]rtm index {repo}[/bold]\n"
+        )
+
+    raise typer.Exit(0 if health.healthy else 1)
 
 
 @app.command()
