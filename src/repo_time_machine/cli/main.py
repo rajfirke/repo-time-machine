@@ -17,7 +17,14 @@ from repo_time_machine.retrieval.code_retriever import CodeRetriever
 from repo_time_machine.retrieval.embeddings import get_embedder
 from repo_time_machine.retrieval.history_retriever import HistoryRetriever
 from repo_time_machine.retrieval.issue_retriever import IssueRetriever
-from repo_time_machine.retrieval.store import ensure_rtm_dir, index_health, is_indexed, save_config
+from repo_time_machine.retrieval.store import (
+    clean_rtm_dir,
+    ensure_rtm_dir,
+    index_health,
+    is_indexed,
+    rtm_dir,
+    save_config,
+)
 
 console = Console()
 app = typer.Typer(
@@ -194,6 +201,40 @@ def status(
         )
 
     raise typer.Exit(0 if health.healthy else 1)
+
+
+@app.command()
+def clean(
+    repo_path: str = typer.Option(".", "--repo", "-r", help="Path to repository."),
+    force: bool = typer.Option(False, "--force", "-f", help="Skip confirmation prompt."),
+):
+    """Remove the .rtm/ index directory to free disk space or prepare for re-indexing."""
+    repo = Path(repo_path).resolve()
+    d = rtm_dir(repo)
+
+    if not d.exists():
+        console.print(f"[dim]Nothing to clean — {d} does not exist.[/dim]")
+        raise typer.Exit(0)
+
+    total_size = sum(f.stat().st_size for f in d.rglob("*") if f.is_file())
+    file_count = sum(1 for f in d.rglob("*") if f.is_file())
+    console.print(
+        f"\n[bold]Will delete:[/bold] {d}\n"
+        f"  Files: {file_count}\n"
+        f"  Size:  {_human_size(total_size)}\n"
+    )
+
+    if not force:
+        confirm = typer.confirm("Proceed?")
+        if not confirm:
+            console.print("[dim]Aborted.[/dim]")
+            raise typer.Exit(0)
+
+    removed, freed = clean_rtm_dir(repo)
+    console.print(
+        f"[green]Cleaned:[/green] {removed} file(s) removed, {_human_size(freed)} freed.\n"
+        f"  Re-run [bold]rtm index {repo}[/bold] to rebuild.\n"
+    )
 
 
 @app.command()

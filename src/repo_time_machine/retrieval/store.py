@@ -103,6 +103,37 @@ class IndexHealth:
         }
 
 
+def clean_rtm_dir(repo_path: str | Path) -> tuple[int, int]:
+    """Remove all files inside .rtm/. Returns (files_removed, bytes_freed)."""
+    import shutil
+
+    d = rtm_dir(repo_path)
+    if not d.exists():
+        return 0, 0
+
+    files_removed = 0
+    bytes_freed = 0
+    for item in d.iterdir():
+        size = item.stat().st_size if item.is_file() else 0
+        if item.is_file():
+            item.unlink()
+            files_removed += 1
+            bytes_freed += size
+        elif item.is_dir():
+            for child in item.rglob("*"):
+                if child.is_file():
+                    bytes_freed += child.stat().st_size
+                    files_removed += 1
+            shutil.rmtree(item)
+
+    try:
+        d.rmdir()
+    except OSError:
+        pass
+
+    return files_removed, bytes_freed
+
+
 def index_health(repo_path: str | Path) -> IndexHealth:
     """Inspect the .rtm/ directory and return a structured health report."""
     d = rtm_dir(repo_path)
