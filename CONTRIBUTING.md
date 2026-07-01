@@ -22,9 +22,16 @@ All tests use mock embedders and run locally — no model downloads or network c
 
 ## Code Style
 
-This project uses [Ruff](https://docs.astral.sh/ruff/) for linting and formatting.
+This project uses [Ruff](https://docs.astral.sh/ruff/) for linting and formatting, enforced via [pre-commit](https://pre-commit.com/) hooks.
 
 ```bash
+# Install hooks (one-time setup)
+pre-commit install
+
+# Run manually on all files
+pre-commit run --all-files
+
+# Or run ruff directly
 ruff check src/ tests/
 ruff format src/ tests/
 ```
