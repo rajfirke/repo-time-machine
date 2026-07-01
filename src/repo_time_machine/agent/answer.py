@@ -17,6 +17,9 @@ class Evidence:
     reference: str  # file path, commit SHA, or issue URL
     excerpt: str  # the relevant text snippet
 
+    def to_dict(self) -> dict:
+        return {"source": self.source, "reference": self.reference, "excerpt": self.excerpt}
+
 
 @dataclass
 class Answer:
@@ -25,6 +28,16 @@ class Answer:
     timeline: list[str] = field(default_factory=list)
     suggested_action: str = ""
     used_llm: bool = False
+
+    def to_dict(self) -> dict:
+        """Serialise the answer for JSON output."""
+        return {
+            "summary": self.summary,
+            "evidence": [e.to_dict() for e in self.evidence],
+            "timeline": self.timeline,
+            "suggested_action": self.suggested_action,
+            "used_llm": self.used_llm,
+        }
 
     def render(self) -> str:
         """Format the answer as a readable markdown string."""
