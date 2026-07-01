@@ -141,6 +141,31 @@ class TestAnswer:
         assert "Nothing found." in rendered
         assert "Evidence" not in rendered
 
+    def test_to_dict_has_all_fields(self):
+        answer = Answer(
+            summary="The function exists.",
+            evidence=[Evidence(source="code", reference="main.py:1-10", excerpt="def hello():")],
+            timeline=["2025-01-15 — added"],
+            suggested_action="Read the tests.",
+            used_llm=True,
+        )
+        d = answer.to_dict()
+        assert d["summary"] == "The function exists."
+        assert d["used_llm"] is True
+        assert d["suggested_action"] == "Read the tests."
+        assert len(d["evidence"]) == 1
+        assert d["evidence"][0]["source"] == "code"
+        assert d["evidence"][0]["reference"] == "main.py:1-10"
+        assert d["timeline"] == ["2025-01-15 — added"]
+
+    def test_to_dict_empty_answer(self):
+        answer = Answer(summary="No evidence.")
+        d = answer.to_dict()
+        assert d["summary"] == "No evidence."
+        assert d["evidence"] == []
+        assert d["timeline"] == []
+        assert d["used_llm"] is False
+
 
 # ---------------------------------------------------------------------------
 # LLM response splitting
