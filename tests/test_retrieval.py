@@ -14,6 +14,7 @@ from repo_time_machine.retrieval.history_retriever import (
     _tokenize,
 )
 from repo_time_machine.retrieval.store import (
+    index_health,
     is_indexed,
     load_config,
     save_config,
@@ -335,3 +336,151 @@ class TestIndexConsistency:
         assert ret2.load() is True
         results = ret2.query("hello", top_k=1)
         assert len(results) == 1
+
+
+# ---------------------------------------------------------------------------
+# index_health
+# ---------------------------------------------------------------------------
+
+
+class TestIndexHealth:
+    def _setup_indexed_repo(self, tmp_path):
+        repo = tmp_path / "repo"
+        repo.mkdir()
+        save_config(repo, {"model": "test", "code_chunks": 10, "commits_indexed": 5})
+        rtm = repo / ".rtm"
+        for name in ("code.faiss", "code_meta.json", "commits.faiss", "commits_meta.json"):
+            (rtm / name).write_bytes(b"x" * 100)
+        return repo
+
+    def test_healthy_repo(self, tmp_path):
+        repo = self._setup_indexed_repo(tmp_path)
+        h = index_health(repo)
+        assert h.indexed
+        assert h.healthy
+        assert h.config["model"] == "test"
+        assert len(h.files) == 6  # 4 required + 2 optional
+        assert all(f.present for f in h.files if f.required)
+
+    def test_unindexed_repo(self, tmp_path):
+        repo = tmp_path / "empty"
+        repo.mkdir()
+        h = index_health(repo)
+        assert not h.indexed
+        assert not h.healthy
+
+    def test_missing_faiss_is_unhealthy(self, tmp_path):
+        repo = self._setup_indexed_repo(tmp_path)
+        (repo / ".rtm" / "code.faiss").unlink()
+        h = index_health(repo)
+        assert h.indexed  # config exists
+        assert not h.healthy  # required file missing
+        missing = [f for f in h.files if not f.present and f.required]
+        assert len(missing) == 1
+        assert missing[0].name == "code.faiss"
+
+    def test_optional_files_dont_affect_health(self, tmp_path):
+        repo = self._setup_indexed_repo(tmp_path)
+        h = index_health(repo)
+        optional = [f for f in h.files if not f.required]
+        assert len(optional) == 2
+        assert not any(f.present for f in optional)
+        assert h.healthy
+
+    def test_to_dict_has_expected_keys(self, tmp_path):
+        repo = self._setup_indexed_repo(tmp_path)
+        d = index_health(repo).to_dict()
+        assert "indexed" in d
+        assert "healthy" in d
+        assert "config" in d
+        assert "files" in d
+        assert isinstance(d["files"], list)
+
+    def test_file_sizes_populated(self, tmp_path):
+        repo = self._setup_indexed_repo(tmp_path)
+        h = index_health(repo)
+        for f in h.files:
+            if f.present:
+                assert f.size_bytes == 100
+
+
+# ---------------------------------------------------------------------------
+# CLI status command
+# ---------------------------------------------------------------------------
+
+
+class TestStatusCommand:
+    def _setup_indexed_repo(self, tmp_path):
+        repo = tmp_path / "repo"
+        repo.mkdir()
+        save_config(
+            repo,
+            {
+                "model": "BAAI/bge-small-en-v1.5",
+                "embed_dim": 384,
+                "chunk_lines": 60,
+                "overlap": 10,
+                "code_chunks": 42,
+                "commits_indexed": 15,
+                "github_slug": "owner/repo",
+                "issues_indexed": 8,
+            },
+        )
+        rtm = repo / ".rtm"
+        for name in ("code.faiss", "code_meta.json", "commits.faiss", "commits_meta.json"):
+            (rtm / name).write_bytes(b"x" * 100)
+        return repo
+
+    def test_status_json_healthy(self, tmp_path):
+        from typer.testing import CliRunner
+
+        from repo_time_machine.cli.main import app
+
+        repo = self._setup_indexed_repo(tmp_path)
+        runner = CliRunner()
+        result = runner.invoke(app, ["status", "--repo", str(repo), "--json"])
+        assert result.exit_code == 0
+        import json
+
+        data = json.loads(result.output)
+        assert data["indexed"] is True
+        assert data["healthy"] is True
+        assert data["config"]["code_chunks"] == 42
+
+    def test_status_json_unindexed(self, tmp_path):
+        from typer.testing import CliRunner
+
+        from repo_time_machine.cli.main import app
+
+        repo = tmp_path / "empty"
+        repo.mkdir()
+        runner = CliRunner()
+        result = runner.invoke(app, ["status", "--repo", str(repo), "--json"])
+        assert result.exit_code == 1
+        import json
+
+        data = json.loads(result.output)
+        assert data["indexed"] is False
+
+    def test_status_rich_output_healthy(self, tmp_path):
+        from typer.testing import CliRunner
+
+        from repo_time_machine.cli.main import app
+
+        repo = self._setup_indexed_repo(tmp_path)
+        runner = CliRunner()
+        result = runner.invoke(app, ["status", "--repo", str(repo)])
+        assert result.exit_code == 0
+        assert "healthy" in result.output.lower() or "present" in result.output.lower()
+
+    def test_status_rich_output_unindexed(self, tmp_path):
+        from typer.testing import CliRunner
+
+        from repo_time_machine.cli.main import app
+
+        repo = tmp_path / "empty"
+        repo.mkdir()
+        runner = CliRunner()
+        result = runner.invoke(app, ["status", "--repo", str(repo)])
+        assert result.exit_code == 1
+        assert "not been indexed" in result.output
