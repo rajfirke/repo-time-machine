@@ -47,6 +47,15 @@ class Pipeline:
         github_slug = cfg.get("github_slug", "")
         embedder = get_embedder(embed_model)
 
+        stored_dim = cfg.get("embed_dim")
+        if stored_dim and stored_dim != embedder.dim:
+            logger.warning(
+                "Embedding dimension mismatch: index has %d, model provides %d — "
+                "results may be wrong; consider re-indexing",
+                stored_dim,
+                embedder.dim,
+            )
+
         self.code_retriever = CodeRetriever(rtm_path, embedder)
         self.hist_retriever = HistoryRetriever(rtm_path, embedder)
         self.issue_retriever = IssueRetriever(rtm_path, embedder, repo_slug=github_slug or "")

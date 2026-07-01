@@ -9,7 +9,7 @@ import numpy as np
 logger = logging.getLogger(__name__)
 
 _DEFAULT_MODEL = "BAAI/bge-small-en-v1.5"
-_EMBED_DIM = 384  # bge-small output dimension
+_FALLBACK_DIM = 384  # pre-load fallback; overridden once the model is loaded
 
 
 class Embedder:
@@ -23,17 +23,20 @@ class Embedder:
     def __init__(self, model_name: str = _DEFAULT_MODEL):
         self.model_name = model_name
         self._model = None
+        self._detected_dim: int | None = None
 
     def _load(self):
         from sentence_transformers import SentenceTransformer
 
         logger.info("Loading embedding model: %s", self.model_name)
         self._model = SentenceTransformer(self.model_name)
+        self._detected_dim = self._model.get_sentence_embedding_dimension()
+        logger.info("Detected embedding dimension: %d", self._detected_dim)
 
     def embed(self, texts: list[str], batch_size: int = 64) -> np.ndarray:
         """Return (N, D) float32 numpy array of embeddings."""
         if not texts:
-            return np.empty((0, _EMBED_DIM), dtype=np.float32)
+            return np.empty((0, self.dim), dtype=np.float32)
         if self._model is None:
             self._load()
         vectors = self._model.encode(
@@ -46,7 +49,10 @@ class Embedder:
 
     @property
     def dim(self) -> int:
-        return _EMBED_DIM
+        """Return the embedding dimension, auto-detected from the model when available."""
+        if self._detected_dim is not None:
+            return self._detected_dim
+        return _FALLBACK_DIM
 
 
 def get_embedder(model_name: str = _DEFAULT_MODEL) -> Embedder:
