@@ -7,6 +7,7 @@ import numpy as np
 from repo_time_machine.ingestion.code_loader import FileChunk
 from repo_time_machine.ingestion.git_history import CommitRecord
 from repo_time_machine.retrieval.code_retriever import CodeResult, CodeRetriever
+from repo_time_machine.retrieval.embeddings import _FALLBACK_DIM, Embedder
 from repo_time_machine.retrieval.history_retriever import (
     HistoryResult,
     HistoryRetriever,
@@ -402,6 +403,28 @@ class TestIndexHealth:
         for f in h.files:
             if f.present:
                 assert f.size_bytes == 100
+
+
+# ---------------------------------------------------------------------------
+# Embedder dimension auto-detection
+# ---------------------------------------------------------------------------
+
+
+class TestEmbedderDim:
+    def test_fallback_dim_before_load(self):
+        embedder = Embedder("BAAI/bge-small-en-v1.5")
+        assert embedder.dim == _FALLBACK_DIM
+
+    def test_detected_dim_overrides_fallback(self):
+        embedder = Embedder("BAAI/bge-small-en-v1.5")
+        embedder._detected_dim = 768
+        assert embedder.dim == 768
+
+    def test_embed_empty_uses_current_dim(self):
+        embedder = Embedder("BAAI/bge-small-en-v1.5")
+        embedder._detected_dim = 1024
+        result = embedder.embed([])
+        assert result.shape == (0, 1024)
 
 
 # ---------------------------------------------------------------------------
