@@ -96,16 +96,23 @@ class CodeRetriever:
             logger.error("Failed to load code index: %s", exc)
             return False
 
-    def query(self, question: str, top_k: int = 5) -> list[CodeResult]:
-        """Return the top-k most relevant code chunks for the question."""
+    def query(self, question: str, top_k: int = 5, min_score: float = 0.0) -> list[CodeResult]:
+        """Return the top-k most relevant code chunks for the question.
+
+        Results with a score below *min_score* are dropped before returning.
+        """
         if self._index is None or self._index.ntotal == 0:
             return []
         q_vec = self.embedder.embed([question])
         k = min(top_k, self._index.ntotal)
         scores, indices = self._index.search(q_vec, k)
         results: list[CodeResult] = []
+        filtered = 0
         for score, idx in zip(scores[0], indices[0]):
             if idx < 0:
+                continue
+            if min_score > 0 and float(score) < min_score:
+                filtered += 1
                 continue
             m = self._meta[idx]
             results.append(
@@ -118,6 +125,8 @@ class CodeRetriever:
                     score=float(score),
                 )
             )
+        if filtered:
+            logger.info("Filtered %d code result(s) below min_score=%.2f", filtered, min_score)
         return results
 
     def _save(self):

@@ -96,7 +96,7 @@ class Pipeline:
         """True when some (but not all) core indexes loaded."""
         return self.ready and not (self._code_loaded and self._hist_loaded)
 
-    def ask(self, question: str, skip_llm: bool = False) -> Answer:
+    def ask(self, question: str, skip_llm: bool = False, min_score: float = 0.0) -> Answer:
         """Run the full pipeline and return a structured Answer."""
         qtype = classify(question)
         logger.info("Question classified as: %s", qtype.value)
@@ -106,15 +106,21 @@ class Pipeline:
         issue_results: list[IssueResult] = []
 
         if should_search_code(qtype) and self._code_loaded:
-            code_results = self.code_retriever.query(question, top_k=self.top_k)
+            code_results = self.code_retriever.query(
+                question, top_k=self.top_k, min_score=min_score
+            )
             logger.info("Code retriever returned %d results", len(code_results))
 
         if should_search_history(qtype) and self._hist_loaded:
-            hist_results = self.hist_retriever.query(question, top_k=self.top_k)
+            hist_results = self.hist_retriever.query(
+                question, top_k=self.top_k, min_score=min_score
+            )
             logger.info("History retriever returned %d results", len(hist_results))
 
         if should_search_issues(qtype) and self.has_issues:
-            issue_results = self.issue_retriever.query(question, top_k=self.top_k)
+            issue_results = self.issue_retriever.query(
+                question, top_k=self.top_k, min_score=min_score
+            )
             logger.info("Issue retriever returned %d results", len(issue_results))
 
         if not code_results and not hist_results and not issue_results:
