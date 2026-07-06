@@ -150,6 +150,23 @@ class TestCodeRetriever:
         )
         assert "a.py:1-10" in r.header()
 
+    def test_min_score_filters_low_results(self, tmp_path):
+        embedder = _fake_embedder()
+        ret = CodeRetriever(tmp_path / ".rtm", embedder)
+        ret.build(_sample_chunks())
+        all_results = ret.query("hello", top_k=3, min_score=0.0)
+        filtered = ret.query("hello", top_k=3, min_score=0.99)
+        assert len(filtered) <= len(all_results)
+
+    def test_min_score_zero_no_filtering(self, tmp_path):
+        """min_score=0.0 should behave identically to the old no-filter default."""
+        embedder = _fake_embedder()
+        ret = CodeRetriever(tmp_path / ".rtm", embedder)
+        ret.build(_sample_chunks())
+        default_results = ret.query("hello", top_k=3)
+        explicit_zero = ret.query("hello", top_k=3, min_score=0.0)
+        assert len(default_results) == len(explicit_zero)
+
 
 # ---------------------------------------------------------------------------
 # HistoryRetriever
@@ -199,6 +216,23 @@ class TestHistoryRetriever:
         commit_match = _sample_commits()[0]  # "Add input validation to utils"
         commit_no = _sample_commits()[1]  # "Initial commit with hello world"
         assert _keyword_score(q_tokens, commit_match) > _keyword_score(q_tokens, commit_no)
+
+    def test_min_score_filters_low_results(self, tmp_path):
+        embedder = _fake_embedder()
+        ret = HistoryRetriever(tmp_path / ".rtm", embedder)
+        ret.build(_sample_commits())
+        all_results = ret.query("validation", top_k=3, min_score=0.0)
+        filtered = ret.query("validation", top_k=3, min_score=0.99)
+        assert len(filtered) <= len(all_results)
+
+    def test_min_score_zero_no_filtering(self, tmp_path):
+        """min_score=0.0 should behave identically to the old no-filter default."""
+        embedder = _fake_embedder()
+        ret = HistoryRetriever(tmp_path / ".rtm", embedder)
+        ret.build(_sample_commits())
+        default_results = ret.query("validation", top_k=3)
+        explicit_zero = ret.query("validation", top_k=3, min_score=0.0)
+        assert len(default_results) == len(explicit_zero)
 
 
 # ---------------------------------------------------------------------------

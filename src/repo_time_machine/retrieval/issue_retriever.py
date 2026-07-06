@@ -120,8 +120,11 @@ class IssueRetriever:
             logger.error("Failed to load issue index: %s", exc)
             return False
 
-    def query(self, question: str, top_k: int = 5) -> list[IssueResult]:
-        """Return the top-k most relevant issues/PRs."""
+    def query(self, question: str, top_k: int = 5, min_score: float = 0.0) -> list[IssueResult]:
+        """Return the top-k most relevant issues/PRs.
+
+        Results with a blended score below *min_score* are dropped.
+        """
         if self._index is None or self._index.ntotal == 0:
             return []
 
@@ -144,7 +147,11 @@ class IssueRetriever:
         scored.sort(key=lambda t: t[0], reverse=True)
 
         results: list[IssueResult] = []
+        filtered = 0
         for blended, idx in scored[:top_k]:
+            if min_score > 0 and blended < min_score:
+                filtered += 1
+                continue
             rec = self._records[idx]
             tag = "PR" if rec.is_pr else "issue"
             results.append(
@@ -154,6 +161,8 @@ class IssueRetriever:
                     score=blended,
                 )
             )
+        if filtered:
+            logger.info("Filtered %d issue result(s) below min_score=%.2f", filtered, min_score)
         return results
 
     @property

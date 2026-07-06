@@ -277,6 +277,11 @@ def ask(
         "-o",
         help="Output format: 'rich' (default) or 'json'.",
     ),
+    min_score: float = typer.Option(
+        0.0,
+        "--min-score",
+        help="Drop results with relevance score below this threshold (0.0–1.0).",
+    ),
 ):
     """Ask a question about the indexed repository."""
     repo = Path(repo_path).resolve()
@@ -318,7 +323,7 @@ def ask(
             console.print("[dim]GitHub issues/PRs available for enrichment[/dim]")
 
     with console.status("[dim]Thinking...[/dim]") if output != "json" else _noop_context():
-        answer = pipeline.ask(question, skip_llm=raw)
+        answer = pipeline.ask(question, skip_llm=raw, min_score=min_score)
 
     if output == "json":
         result = answer.to_dict()
