@@ -1,9 +1,10 @@
-"""CLI commands: index, ask, and status."""
+"""CLI commands: index, ask, clean, and status."""
 
 from __future__ import annotations
 
 import json
 import time
+from contextlib import contextmanager
 from pathlib import Path
 
 import typer
@@ -27,6 +28,13 @@ from repo_time_machine.retrieval.store import (
 )
 
 console = Console()
+
+
+@contextmanager
+def _noop_context():
+    yield
+
+
 app = typer.Typer(
     name="rtm",
     help="Repo Time Machine — ask questions backed by code, commits, and issues.",
@@ -258,38 +266,60 @@ def ask(
         "--raw",
         help="Show raw evidence without LLM synthesis.",
     ),
+    output: str = typer.Option(
+        "rich",
+        "--output",
+        "-o",
+        help="Output format: 'rich' (default) or 'json'.",
+    ),
 ):
     """Ask a question about the indexed repository."""
     repo = Path(repo_path).resolve()
     if not is_indexed(repo):
-        console.print(
-            f"[red]Error:[/red] {repo} has not been indexed yet. Run [bold]rtm index[/bold] first."
-        )
+        if output == "json":
+            print(json.dumps({"error": "Repository has not been indexed yet."}))  # noqa: T201
+        else:
+            console.print(
+                f"[red]Error:[/red] {repo} has not been indexed yet."
+                " Run [bold]rtm index[/bold] first."
+            )
         raise typer.Exit(1)
 
     from repo_time_machine.agent.pipeline import Pipeline
 
-    console.print(f"\n[bold]Question:[/bold] {question}\n")
+    if output != "json":
+        console.print(f"\n[bold]Question:[/bold] {question}\n")
 
     pipeline = Pipeline(repo_path=repo, llm_model=llm_model, top_k=top_k)
     if not pipeline.ready:
-        console.print("[red]Error:[/red] Could not load indexes. Re-run [bold]rtm index[/bold].")
-        for err in pipeline.load_errors:
-            console.print(f"  [dim]{err}[/dim]")
+        if output == "json":
+            print(json.dumps({"error": "Could not load indexes."}))  # noqa: T201
+        else:
+            console.print(
+                "[red]Error:[/red] Could not load indexes. Re-run [bold]rtm index[/bold]."
+            )
+            for err in pipeline.load_errors:
+                console.print(f"  [dim]{err}[/dim]")
         raise typer.Exit(1)
 
-    if pipeline.partial:
-        console.print(
-            "[yellow]Warning:[/yellow] Only partial indexes loaded; results may be limited."
-        )
-        for err in pipeline.load_errors:
-            console.print(f"  [dim]{err}[/dim]")
+    if output != "json":
+        if pipeline.partial:
+            console.print(
+                "[yellow]Warning:[/yellow] Only partial indexes loaded; results may be limited."
+            )
+            for err in pipeline.load_errors:
+                console.print(f"  [dim]{err}[/dim]")
+        if pipeline.has_issues:
+            console.print("[dim]GitHub issues/PRs available for enrichment[/dim]")
 
-    if pipeline.has_issues:
-        console.print("[dim]GitHub issues/PRs available for enrichment[/dim]")
-
-    with console.status("[dim]Thinking...[/dim]"):
+    with console.status("[dim]Thinking...[/dim]") if output != "json" else _noop_context():
         answer = pipeline.ask(question, skip_llm=raw)
+
+    if output == "json":
+        result = answer.to_dict()
+        result["question"] = question
+        print(json.dumps(result, indent=2))  # noqa: T201
+        return
 
     if raw:
         console.print("[cyan]Raw evidence mode (--raw)[/cyan]\n")
