@@ -61,6 +61,9 @@ def index(
         help="GitHub repo slug (owner/repo) to fetch issues and PRs from.",
     ),
     max_issues: int = typer.Option(200, "--max-issues", help="Max issues/PRs to fetch."),
+    skip_merges: bool = typer.Option(
+        False, "--skip-merges", help="Exclude merge commits from history index."
+    ),
 ):
     """Ingest a repository: index source files, git history, and optionally GitHub issues."""
     repo = Path(repo_path).resolve()
@@ -81,8 +84,9 @@ def index(
     console.print(f"      {len(chunks)} code chunks extracted")
 
     console.print(f"[dim]2/{steps}[/dim] Extracting git history...")
-    commits = extract_history(repo, max_commits=max_commits)
-    console.print(f"      {len(commits)} commits extracted")
+    commits = extract_history(repo, max_commits=max_commits, skip_merges=skip_merges)
+    merge_note = " (merge commits excluded)" if skip_merges else ""
+    console.print(f"      {len(commits)} commits extracted{merge_note}")
 
     console.print(f"[dim]3/{steps}[/dim] Building embeddings and FAISS indexes...")
     code_ret = CodeRetriever(rtm_path, embedder)
@@ -114,6 +118,7 @@ def index(
             "commits_indexed": hist_count,
             "github_slug": github_slug,
             "issues_indexed": issue_count,
+            "skip_merges": skip_merges,
         },
     )
 

@@ -22,6 +22,7 @@ class CommitRecord:
     message: str
     files_changed: list[str] = field(default_factory=list)
     diff_summary: str = ""
+    is_merge: bool = False
 
     @property
     def short_sha(self) -> str:
@@ -79,6 +80,7 @@ def _to_record(commit) -> CommitRecord:
         message=commit.message.strip(),
         files_changed=_files_from_diffs(diffs),
         diff_summary=_format_diffs(diffs),
+        is_merge=len(commit.parents) > 1,
     )
 
 
@@ -86,12 +88,14 @@ def extract_history(
     repo_path: str | Path,
     max_commits: int = 500,
     branch: str | None = None,
+    skip_merges: bool = False,
 ) -> list[CommitRecord]:
     """
     Return CommitRecord objects for the repo, newest-first.
 
-    max_commits: cap to avoid blowing up on huge repos.
-    branch:      specific branch to walk (defaults to active branch).
+    max_commits:  cap to avoid blowing up on huge repos.
+    branch:       specific branch to walk (defaults to active branch).
+    skip_merges:  when True, exclude merge commits (commits with >1 parent).
     """
     repo_path = Path(repo_path).resolve()
     try:
@@ -114,9 +118,15 @@ def extract_history(
         ref = repo.active_branch
 
     records: list[CommitRecord] = []
+    skipped = 0
     for commit in repo.iter_commits(ref, max_count=max_commits):
+        if skip_merges and len(commit.parents) > 1:
+            skipped += 1
+            continue
         records.append(_to_record(commit))
 
+    if skipped:
+        logger.info("Skipped %d merge commit(s)", skipped)
     logger.info("Extracted %d commits from %s", len(records), repo_path)
     return records
 

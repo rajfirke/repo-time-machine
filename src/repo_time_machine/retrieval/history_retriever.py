@@ -133,6 +133,7 @@ class HistoryRetriever:
                 "message": c.message,
                 "files_changed": c.files_changed,
                 "diff_summary": c.diff_summary,
+                "is_merge": c.is_merge,
             }
             for c in self._records
         ]

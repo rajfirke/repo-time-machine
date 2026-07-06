@@ -300,3 +300,71 @@ class TestDeduplicatedDiff:
     def test_empty_diffs_produce_empty_outputs(self):
         assert _format_diffs([]) == ""
         assert _files_from_diffs([]) == []
+
+
+# ---------------------------------------------------------------------------
+# Merge commit filtering (issue #52)
+# ---------------------------------------------------------------------------
+
+
+class TestMergeCommitFiltering:
+    """Verify that skip_merges excludes merge commits and is_merge is set correctly."""
+
+    def _make_repo_with_merge(self, tmp_path: Path) -> Repo:
+        """Create a repo with a merge commit."""
+        repo = Repo.init(tmp_path, initial_branch="main")
+        repo.config_writer().set_value("user", "name", "Test").release()
+        repo.config_writer().set_value("user", "email", "test@test.com").release()
+
+        (tmp_path / "a.txt").write_text("initial\n")
+        repo.index.add(["a.txt"])
+        repo.index.commit("initial commit")
+
+        repo.create_head("feature")
+        repo.heads.feature.checkout()
+        (tmp_path / "b.txt").write_text("feature work\n")
+        repo.index.add(["b.txt"])
+        repo.index.commit("add feature")
+
+        repo.heads.main.checkout()
+        (tmp_path / "c.txt").write_text("main work\n")
+        repo.index.add(["c.txt"])
+        repo.index.commit("main work")
+
+        repo.index.merge_tree(repo.heads.feature)
+        repo.index.commit(
+            "Merge branch 'feature' into main",
+            parent_commits=(repo.heads.main.commit, repo.heads.feature.commit),
+        )
+        return repo
+
+    def test_is_merge_flag_set_on_merge_commits(self, tmp_path):
+        self._make_repo_with_merge(tmp_path)
+        records = extract_history(tmp_path)
+        merge_records = [r for r in records if r.is_merge]
+        non_merge = [r for r in records if not r.is_merge]
+        assert len(merge_records) >= 1
+        assert len(non_merge) >= 2
+
+    def test_skip_merges_excludes_merge_commits(self, tmp_path):
+        self._make_repo_with_merge(tmp_path)
+        all_records = extract_history(tmp_path)
+        filtered = extract_history(tmp_path, skip_merges=True)
+        assert len(filtered) < len(all_records)
+        assert all(not r.is_merge for r in filtered)
+
+    def test_skip_merges_false_includes_everything(self, tmp_path):
+        self._make_repo_with_merge(tmp_path)
+        all_records = extract_history(tmp_path, skip_merges=False)
+        assert any(r.is_merge for r in all_records)
+
+    def test_is_merge_false_for_normal_commits(self, tmp_path):
+        repo = Repo.init(tmp_path)
+        repo.config_writer().set_value("user", "name", "Test").release()
+        repo.config_writer().set_value("user", "email", "test@test.com").release()
+        (tmp_path / "x.txt").write_text("hello\n")
+        repo.index.add(["x.txt"])
+        repo.index.commit("normal commit")
+        records = extract_history(tmp_path)
+        assert len(records) == 1
+        assert not records[0].is_merge
