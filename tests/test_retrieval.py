@@ -15,6 +15,7 @@ from repo_time_machine.retrieval.history_retriever import (
     _tokenize,
 )
 from repo_time_machine.retrieval.store import (
+    clean_rtm_dir,
     index_health,
     is_indexed,
     load_config,
@@ -507,3 +508,56 @@ class TestStatusCommand:
         result = runner.invoke(app, ["status", "--repo", str(repo)])
         assert result.exit_code == 1
         assert "not been indexed" in result.output
+
+
+# ---------------------------------------------------------------------------
+# clean_rtm_dir
+# ---------------------------------------------------------------------------
+
+
+class TestCleanRtmDir:
+    def test_clean_removes_index_files(self, tmp_path):
+        repo = tmp_path / "repo"
+        repo.mkdir()
+        save_config(repo, {"model": "test"})
+        rtm = repo / ".rtm"
+        for name in ("code.faiss", "code_meta.json"):
+            (rtm / name).write_bytes(b"x" * 50)
+        removed, freed = clean_rtm_dir(repo)
+        assert removed == 3  # config.json + 2 files
+        assert freed > 0
+        assert not rtm.exists()
+
+    def test_clean_nonexistent_is_noop(self, tmp_path):
+        removed, freed = clean_rtm_dir(tmp_path / "nope")
+        assert removed == 0
+        assert freed == 0
+
+
+class TestCleanCommand:
+    def test_clean_with_force(self, tmp_path):
+        from typer.testing import CliRunner
+
+        from repo_time_machine.cli.main import app
+
+        repo = tmp_path / "repo"
+        repo.mkdir()
+        save_config(repo, {"model": "test"})
+        (repo / ".rtm" / "code.faiss").write_bytes(b"x" * 100)
+
+        runner = CliRunner()
+        result = runner.invoke(app, ["clean", "--repo", str(repo), "--force"])
+        assert result.exit_code == 0
+        assert "Cleaned" in result.output
+
+    def test_clean_nothing_to_clean(self, tmp_path):
+        from typer.testing import CliRunner
+
+        from repo_time_machine.cli.main import app
+
+        repo = tmp_path / "empty"
+        repo.mkdir()
+        runner = CliRunner()
+        result = runner.invoke(app, ["clean", "--repo", str(repo), "--force"])
+        assert result.exit_code == 0
+        assert "Nothing to clean" in result.output
