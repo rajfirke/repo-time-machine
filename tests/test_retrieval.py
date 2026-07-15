@@ -16,6 +16,7 @@ from repo_time_machine.retrieval.history_retriever import (
 )
 from repo_time_machine.retrieval.store import (
     clean_rtm_dir,
+    clear_index,
     index_health,
     is_indexed,
     load_config,
@@ -646,3 +647,47 @@ class TestAskTopKValidation:
         result = runner.invoke(app, ["ask", "hello?", "--top-k", "-1"])
         assert result.exit_code == 1
         assert "top-k" in result.output.lower()
+
+
+# ---------------------------------------------------------------------------
+# clear_index (issue #13 — stale artifacts on re-index)
+# ---------------------------------------------------------------------------
+
+
+class TestClearIndex:
+    def test_removes_all_known_artifacts(self, tmp_path):
+        repo = tmp_path / "repo"
+        repo.mkdir()
+        save_config(repo, {"model": "test"})
+        rtm = repo / ".rtm"
+        for name in ("code.faiss", "code_meta.json", "commits.faiss", "commits_meta.json"):
+            (rtm / name).write_bytes(b"x" * 50)
+        for name in ("issues.faiss", "issues_meta.json"):
+            (rtm / name).write_bytes(b"x" * 30)
+
+        removed = clear_index(repo)
+        assert removed == 7  # 4 required + 2 optional + config.json
+        assert rtm.exists()  # directory itself stays
+        assert not any(rtm.iterdir())  # but empty
+
+    def test_removes_only_existing_files(self, tmp_path):
+        repo = tmp_path / "repo"
+        repo.mkdir()
+        save_config(repo, {"model": "test"})
+        removed = clear_index(repo)
+        assert removed == 1  # only config.json existed
+
+    def test_noop_on_missing_rtm_dir(self, tmp_path):
+        removed = clear_index(tmp_path / "nope")
+        assert removed == 0
+
+    def test_preserves_unknown_files(self, tmp_path):
+        repo = tmp_path / "repo"
+        repo.mkdir()
+        rtm = repo / ".rtm"
+        rtm.mkdir()
+        (rtm / "custom_notes.txt").write_text("keep me")
+        save_config(repo, {"model": "test"})
+
+        clear_index(repo)
+        assert (rtm / "custom_notes.txt").exists()
