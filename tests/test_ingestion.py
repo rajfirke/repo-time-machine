@@ -84,6 +84,51 @@ class TestChunkFile:
         chunks = chunk_file(empty, tmp_path)
         assert chunks == []
 
+    def test_chunk_lines_zero_raises(self, tmp_path):
+        f = tmp_path / "a.py"
+        f.write_text("x = 1\n")
+        import pytest
+
+        with pytest.raises(ValueError, match="chunk_lines must be >= 1"):
+            chunk_file(f, tmp_path, chunk_lines=0)
+
+    def test_chunk_lines_negative_raises(self, tmp_path):
+        f = tmp_path / "a.py"
+        f.write_text("x = 1\n")
+        import pytest
+
+        with pytest.raises(ValueError, match="chunk_lines must be >= 1"):
+            chunk_file(f, tmp_path, chunk_lines=-1)
+
+    def test_overlap_negative_raises(self, tmp_path):
+        f = tmp_path / "a.py"
+        f.write_text("x = 1\n")
+        import pytest
+
+        with pytest.raises(ValueError, match="overlap_lines must be >= 0"):
+            chunk_file(f, tmp_path, chunk_lines=10, overlap_lines=-1)
+
+    def test_overlap_ge_chunk_lines_raises(self, tmp_path):
+        f = tmp_path / "a.py"
+        f.write_text("x = 1\n")
+        import pytest
+
+        with pytest.raises(ValueError, match="overlap_lines.*must be < chunk_lines"):
+            chunk_file(f, tmp_path, chunk_lines=5, overlap_lines=5)
+
+        with pytest.raises(ValueError, match="overlap_lines.*must be < chunk_lines"):
+            chunk_file(f, tmp_path, chunk_lines=5, overlap_lines=100)
+
+    def test_ingest_repo_rejects_invalid_params(self, tmp_path):
+        import pytest
+
+        with pytest.raises(ValueError, match="chunk_lines must be >= 1"):
+            ingest_repo(tmp_path, chunk_lines=0)
+        with pytest.raises(ValueError, match="overlap_lines must be >= 0"):
+            ingest_repo(tmp_path, chunk_lines=10, overlap_lines=-5)
+        with pytest.raises(ValueError, match="overlap_lines.*must be < chunk_lines"):
+            ingest_repo(tmp_path, chunk_lines=5, overlap_lines=10)
+
 
 class TestIngestRepo:
     def test_returns_file_chunks(self):
