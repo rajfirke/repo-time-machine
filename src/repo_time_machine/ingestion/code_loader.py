@@ -137,6 +137,13 @@ def chunk_file(
 
     Small files (≤ chunk_lines) produce a single chunk.
     """
+    if chunk_lines < 1:
+        raise ValueError(f"chunk_lines must be >= 1, got {chunk_lines}")
+    if overlap_lines < 0:
+        raise ValueError(f"overlap_lines must be >= 0, got {overlap_lines}")
+    if overlap_lines >= chunk_lines:
+        raise ValueError(f"overlap_lines ({overlap_lines}) must be < chunk_lines ({chunk_lines})")
+
     text = load_file(file_path)
     if not text.strip():
         return []
@@ -186,6 +193,13 @@ def ingest_repo(
 
     This is the main entry point for the ingestion pipeline.
     """
+    if chunk_lines < 1:
+        raise ValueError(f"chunk_lines must be >= 1, got {chunk_lines}")
+    if overlap_lines < 0:
+        raise ValueError(f"overlap_lines must be >= 0, got {overlap_lines}")
+    if overlap_lines >= chunk_lines:
+        raise ValueError(f"overlap_lines ({overlap_lines}) must be < chunk_lines ({chunk_lines})")
+
     root = Path(repo_path).resolve()
     all_chunks: list[FileChunk] = []
     file_count = 0
