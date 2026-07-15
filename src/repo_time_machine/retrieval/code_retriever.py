@@ -103,6 +103,8 @@ class CodeRetriever:
         """
         if self._index is None or self._index.ntotal == 0:
             return []
+        if top_k < 1:
+            return []
         q_vec = self.embedder.embed([question])
         k = min(top_k, self._index.ntotal)
         scores, indices = self._index.search(q_vec, k)

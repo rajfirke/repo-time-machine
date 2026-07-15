@@ -284,6 +284,13 @@ def ask(
     ),
 ):
     """Ask a question about the indexed repository."""
+    if top_k < 1:
+        if output == "json":
+            print(json.dumps({"error": "--top-k must be >= 1"}))  # noqa: T201
+        else:
+            console.print("[red]Error:[/red] --top-k must be >= 1.")
+        raise typer.Exit(1)
+
     repo = Path(repo_path).resolve()
     if not is_indexed(repo):
         if output == "json":

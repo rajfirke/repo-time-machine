@@ -127,6 +127,8 @@ class IssueRetriever:
         """
         if self._index is None or self._index.ntotal == 0:
             return []
+        if top_k < 1:
+            return []
 
         q_vec = self.embedder.embed([question])
         n = self._index.ntotal

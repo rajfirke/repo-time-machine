@@ -167,6 +167,18 @@ class TestCodeRetriever:
         explicit_zero = ret.query("hello", top_k=3, min_score=0.0)
         assert len(default_results) == len(explicit_zero)
 
+    def test_top_k_zero_returns_empty(self, tmp_path):
+        embedder = _fake_embedder()
+        ret = CodeRetriever(tmp_path / ".rtm", embedder)
+        ret.build(_sample_chunks())
+        assert ret.query("hello", top_k=0) == []
+
+    def test_top_k_negative_returns_empty(self, tmp_path):
+        embedder = _fake_embedder()
+        ret = CodeRetriever(tmp_path / ".rtm", embedder)
+        ret.build(_sample_chunks())
+        assert ret.query("hello", top_k=-1) == []
+
 
 # ---------------------------------------------------------------------------
 # HistoryRetriever
@@ -224,6 +236,18 @@ class TestHistoryRetriever:
         all_results = ret.query("validation", top_k=3, min_score=0.0)
         filtered = ret.query("validation", top_k=3, min_score=0.99)
         assert len(filtered) <= len(all_results)
+
+    def test_top_k_zero_returns_empty(self, tmp_path):
+        embedder = _fake_embedder()
+        ret = HistoryRetriever(tmp_path / ".rtm", embedder)
+        ret.build(_sample_commits())
+        assert ret.query("validation", top_k=0) == []
+
+    def test_top_k_negative_returns_empty(self, tmp_path):
+        embedder = _fake_embedder()
+        ret = HistoryRetriever(tmp_path / ".rtm", embedder)
+        ret.build(_sample_commits())
+        assert ret.query("validation", top_k=-1) == []
 
     def test_min_score_zero_no_filtering(self, tmp_path):
         """min_score=0.0 should behave identically to the old no-filter default."""
@@ -595,3 +619,30 @@ class TestCleanCommand:
         result = runner.invoke(app, ["clean", "--repo", str(repo), "--force"])
         assert result.exit_code == 0
         assert "Nothing to clean" in result.output
+
+
+# ---------------------------------------------------------------------------
+# top_k validation at CLI level (issue #18)
+# ---------------------------------------------------------------------------
+
+
+class TestAskTopKValidation:
+    def test_top_k_zero_rejected(self):
+        from typer.testing import CliRunner
+
+        from repo_time_machine.cli.main import app
+
+        runner = CliRunner()
+        result = runner.invoke(app, ["ask", "hello?", "--top-k", "0"])
+        assert result.exit_code == 1
+        assert "top-k" in result.output.lower()
+
+    def test_top_k_negative_rejected(self):
+        from typer.testing import CliRunner
+
+        from repo_time_machine.cli.main import app
+
+        runner = CliRunner()
+        result = runner.invoke(app, ["ask", "hello?", "--top-k", "-1"])
+        assert result.exit_code == 1
+        assert "top-k" in result.output.lower()
