@@ -20,6 +20,7 @@ from repo_time_machine.retrieval.history_retriever import HistoryRetriever
 from repo_time_machine.retrieval.issue_retriever import IssueRetriever
 from repo_time_machine.retrieval.store import (
     clean_rtm_dir,
+    clear_index,
     ensure_rtm_dir,
     index_health,
     is_indexed,
@@ -77,6 +78,9 @@ def index(
     console.print(f"\n[bold]Indexing:[/bold] {repo}\n")
 
     rtm_path = ensure_rtm_dir(repo)
+    cleared = clear_index(repo)
+    if cleared:
+        console.print(f"[dim]Cleared {cleared} old index artifact(s)[/dim]")
     embedder = get_embedder(model)
 
     console.print(f"[dim]1/{steps}[/dim] Ingesting source files...")

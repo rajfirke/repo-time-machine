@@ -49,6 +49,25 @@ def load_config(repo_path: str | Path) -> dict | None:
         return None
 
 
+_ALL_INDEX_FILES = (*REQUIRED_INDEX_FILES, *OPTIONAL_INDEX_FILES, CONFIG_FILE)
+
+
+def clear_index(repo_path: str | Path) -> int:
+    """Remove all known index artifacts from .rtm/ before a fresh build.
+
+    Returns the number of files removed.
+    """
+    d = rtm_dir(repo_path)
+    removed = 0
+    for name in _ALL_INDEX_FILES:
+        artifact = d / name
+        if artifact.exists():
+            artifact.unlink()
+            removed += 1
+            logger.info("Removed stale artifact: %s", artifact)
+    return removed
+
+
 def is_indexed(repo_path: str | Path) -> bool:
     """Check whether a repo has been fully indexed.
 
