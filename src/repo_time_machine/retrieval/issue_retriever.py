@@ -238,7 +238,7 @@ def _issue_to_text(rec: IssueRecord) -> str:
     return f"[{tag} #{rec.number}] {rec.title}\nLabels: {labels_str}\n{body_preview}"
 
 
-_SPLIT_RE = re.compile(r"[^a-z0-9]+")
+_SPLIT_RE = re.compile(r"\W+", re.UNICODE)
 
 
 def _tokenize(text: str) -> set[str]:

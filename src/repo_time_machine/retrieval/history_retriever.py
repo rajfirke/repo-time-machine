@@ -130,8 +130,16 @@ class HistoryRetriever:
         return results
 
     def timeline_for_file(self, relative_path: str) -> list[CommitRecord]:
-        """Return commits that touched a specific file."""
-        return [c for c in self._records if relative_path in c.files_changed]
+        """Return commits that touched a specific file.
+
+        Accepts exact relative paths, bare filenames, or ``./``-prefixed paths.
+        """
+        normalized = relative_path.lstrip("./")
+        return [
+            c
+            for c in self._records
+            if any(f == normalized or f.endswith("/" + normalized) for f in c.files_changed)
+        ]
 
     def _save(self):
         self.index_dir.mkdir(parents=True, exist_ok=True)
@@ -157,7 +165,7 @@ class HistoryRetriever:
         return f"{commit.message}\nFiles: {files}"
 
 
-_SPLIT_RE = re.compile(r"[^a-z0-9]+")
+_SPLIT_RE = re.compile(r"\W+", re.UNICODE)
 
 
 def _tokenize(text: str) -> set[str]:
