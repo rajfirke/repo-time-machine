@@ -277,6 +277,56 @@ class TestTokenize:
         assert "b" not in tokens
         assert "cd" in tokens
 
+    def test_cjk_text_produces_tokens(self):
+        tokens = _tokenize("修复验证错误")
+        assert len(tokens) >= 1
+
+    def test_accented_latin_preserved(self):
+        tokens = _tokenize("café résumé naïve")
+        assert "café" in tokens
+        assert "résumé" in tokens
+        assert "naïve" in tokens
+
+    def test_cyrillic_text_produces_tokens(self):
+        tokens = _tokenize("исправить ошибку валидации")
+        assert "исправить" in tokens
+        assert "ошибку" in tokens
+
+
+# ---------------------------------------------------------------------------
+# timeline_for_file path matching (issue #20)
+# ---------------------------------------------------------------------------
+
+
+class TestTimelineForFile:
+    def test_exact_path(self, tmp_path):
+        embedder = _fake_embedder()
+        ret = HistoryRetriever(tmp_path / ".rtm", embedder)
+        ret.build(_sample_commits())
+        result = ret.timeline_for_file("src/utils.py")
+        assert len(result) == 2
+
+    def test_basename_only(self, tmp_path):
+        embedder = _fake_embedder()
+        ret = HistoryRetriever(tmp_path / ".rtm", embedder)
+        ret.build(_sample_commits())
+        result = ret.timeline_for_file("utils.py")
+        assert len(result) == 2
+
+    def test_dot_slash_prefix(self, tmp_path):
+        embedder = _fake_embedder()
+        ret = HistoryRetriever(tmp_path / ".rtm", embedder)
+        ret.build(_sample_commits())
+        result = ret.timeline_for_file("./src/utils.py")
+        assert len(result) == 2
+
+    def test_no_match_returns_empty(self, tmp_path):
+        embedder = _fake_embedder()
+        ret = HistoryRetriever(tmp_path / ".rtm", embedder)
+        ret.build(_sample_commits())
+        result = ret.timeline_for_file("nonexistent.py")
+        assert result == []
+
 
 # ---------------------------------------------------------------------------
 # Store
