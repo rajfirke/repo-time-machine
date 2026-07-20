@@ -46,6 +46,43 @@ class TestIterSourceFiles:
         assert ".toml" in extensions
         assert ".md" in extensions
 
+    def test_excludes_gitignored_files(self, tmp_path):
+        """Files matched by .gitignore should not be yielded."""
+        repo = Repo.init(tmp_path)
+        repo.config_writer().set_value("user", "name", "Test").release()
+        repo.config_writer().set_value("user", "email", "test@test.com").release()
+
+        (tmp_path / "app.py").write_text("x = 1\n")
+        (tmp_path / "debug.log").write_text("noise\n")
+        (tmp_path / ".gitignore").write_text("*.log\n")
+
+        repo.index.add(["app.py", ".gitignore"])
+        repo.index.commit("init")
+
+        files = list(iter_source_files(tmp_path))
+        names = {f.name for f in files}
+        assert "app.py" in names
+        assert "debug.log" not in names
+
+    def test_excludes_gitignored_directory(self, tmp_path):
+        repo = Repo.init(tmp_path)
+        repo.config_writer().set_value("user", "name", "Test").release()
+        repo.config_writer().set_value("user", "email", "test@test.com").release()
+
+        (tmp_path / "src").mkdir()
+        (tmp_path / "src" / "main.py").write_text("print('hi')\n")
+        (tmp_path / "coverage").mkdir()
+        (tmp_path / "coverage" / "report.json").write_text("{}\n")
+        (tmp_path / ".gitignore").write_text("coverage/\n")
+
+        repo.index.add(["src/main.py", ".gitignore"])
+        repo.index.commit("init")
+
+        files = list(iter_source_files(tmp_path))
+        names = {f.name for f in files}
+        assert "main.py" in names
+        assert "report.json" not in names
+
 
 class TestLoadFile:
     def test_reads_existing_file(self):
