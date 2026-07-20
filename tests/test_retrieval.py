@@ -363,6 +363,30 @@ class TestStore:
     def test_load_missing(self, tmp_path):
         assert load_config(tmp_path / "nope") is None
 
+    def test_load_config_non_dict_returns_none(self, tmp_path):
+        repo = tmp_path / "myrepo"
+        repo.mkdir()
+        rtm = repo / ".rtm"
+        rtm.mkdir()
+        (rtm / "config.json").write_text("[1, 2, 3]")
+        assert load_config(repo) is None
+
+    def test_load_config_string_returns_none(self, tmp_path):
+        repo = tmp_path / "myrepo"
+        repo.mkdir()
+        rtm = repo / ".rtm"
+        rtm.mkdir()
+        (rtm / "config.json").write_text('"just a string"')
+        assert load_config(repo) is None
+
+    def test_load_config_valid_dict_works(self, tmp_path):
+        repo = tmp_path / "myrepo"
+        repo.mkdir()
+        save_config(repo, {"model": "test", "chunks": 5})
+        cfg = load_config(repo)
+        assert isinstance(cfg, dict)
+        assert cfg["model"] == "test"
+
 
 # ---------------------------------------------------------------------------
 # Index consistency validation
