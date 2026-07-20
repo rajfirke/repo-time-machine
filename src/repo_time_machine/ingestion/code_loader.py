@@ -101,18 +101,52 @@ def _language_from_ext(ext: str) -> str:
     return mapping.get(ext, "text")
 
 
+def _git_tracked_files(root: Path) -> list[Path] | None:
+    """Return git-tracked files via ``git ls-files``, or *None* if not a git repo."""
+    try:
+        from git import Repo
+        from git.exc import InvalidGitRepositoryError
+    except ImportError:
+        return None
+    try:
+        repo = Repo(root)
+    except InvalidGitRepositoryError:
+        return None
+    tracked = repo.git.ls_files().splitlines()
+    return [root / rel for rel in tracked if rel]
+
+
 def iter_source_files(repo_path: str | Path) -> Iterator[Path]:
-    """Yield all text-based source files, skipping generated/vendor dirs."""
+    """Yield text-based source files, respecting ``.gitignore`` when possible.
+
+    In a git repository, only files tracked by git are considered — this
+    automatically excludes anything matched by ``.gitignore``.  Falls back
+    to ``rglob`` with ``SKIP_DIRS`` filtering for non-git directories.
+    """
     root = Path(repo_path).resolve()
-    for path in root.rglob("*"):
-        if any(skip in path.parts for skip in SKIP_DIRS):
-            continue
-        if not path.is_file():
-            continue
-        if path.stat().st_size > MAX_FILE_SIZE:
-            continue
-        if path.name in ALWAYS_INCLUDE or path.suffix in TEXT_EXTENSIONS:
-            yield path
+    tracked = _git_tracked_files(root)
+
+    if tracked is not None:
+        for path in tracked:
+            if not path.is_file():
+                continue
+            try:
+                if path.stat().st_size > MAX_FILE_SIZE:
+                    continue
+            except OSError:
+                continue
+            if path.name in ALWAYS_INCLUDE or path.suffix in TEXT_EXTENSIONS:
+                yield path
+    else:
+        for path in root.rglob("*"):
+            if any(skip in path.parts for skip in SKIP_DIRS):
+                continue
+            if not path.is_file():
+                continue
+            if path.stat().st_size > MAX_FILE_SIZE:
+                continue
+            if path.name in ALWAYS_INCLUDE or path.suffix in TEXT_EXTENSIONS:
+                yield path
 
 
 def load_file(path: Path) -> str:
