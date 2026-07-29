@@ -12,7 +12,7 @@ Most "chat with your code" tools read only the current snapshot. **Repo Time Mac
 - *Which commit introduced this bug?*
 - *What issue or PR explains this design?*
 - *How should I safely refactor this function?*
-
+  
 ---
 
 ## How It Works
