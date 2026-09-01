@@ -37,16 +37,24 @@ def save_config(repo_path: str | Path, config: dict) -> None:
 
 
 def load_config(repo_path: str | Path) -> dict | None:
-    """Read index configuration. Returns None if corrupt or missing."""
+    """Read index configuration. Returns None if corrupt, non-dict, or missing."""
     cfg = rtm_dir(repo_path) / CONFIG_FILE
     if not cfg.exists():
         return None
     try:
         with open(cfg, encoding="utf-8") as f:
-            return json.load(f)
+            data = json.load(f)
     except (json.JSONDecodeError, OSError) as exc:
         logger.warning("Corrupt config at %s: %s", cfg, exc)
         return None
+    if not isinstance(data, dict):
+        logger.warning(
+            "Invalid config type at %s: expected dict, got %s",
+            cfg,
+            type(data).__name__,
+        )
+        return None
+    return data
 
 
 _ALL_INDEX_FILES = (*REQUIRED_INDEX_FILES, *OPTIONAL_INDEX_FILES, CONFIG_FILE)
