@@ -16,7 +16,7 @@ Most "chat with your code" tools read only the current snapshot. **Repo Time Mac
 ---
 
 ## How It Works
-
+ 
 ```
 Your question
     │
