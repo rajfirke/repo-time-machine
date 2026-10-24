@@ -96,6 +96,7 @@ def _history_to_evidence(results: list[HistoryResult]) -> list[Evidence]:
 
 
 def _issue_to_evidence(results: list[IssueResult]) -> list[Evidence]:
+    #connectivity (need some partial improvements)
     items: list[Evidence] = []
     for ir in results:
         rec = ir.issue
