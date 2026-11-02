@@ -9,7 +9,7 @@
 Most "chat with your code" tools read only the current snapshot. **Repo Time Machine** treats the entire git history as searchable memory, so you can ask:
 
 - *Why does this validation exist?*
-- *Which commit introduced this bug?*
+- *Which commit introduced the specific bug?*
 - *What issue or PR explains this design?*
 - *How should I safely refactor this function?*
   
