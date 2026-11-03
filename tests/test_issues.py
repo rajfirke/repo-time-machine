@@ -3,7 +3,7 @@
 from unittest.mock import MagicMock
 
 import numpy as np
-
+# add lazy import 
 from repo_time_machine.retrieval.issue_retriever import (
     IssueRecord,
     IssueResult,
